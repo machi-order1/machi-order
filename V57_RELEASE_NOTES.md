@@ -1,0 +1,13 @@
+# V57 ATOMIC SHIFT PUBLISH
+- DB RPC publish_shift_draft_atomic
+- draft row lock
+- active membership check
+- required capability check
+- existing scheduled/working overlap check
+- work_shift insert + draft published + change log in one transaction
+- RPC is not callable directly by anon/authenticated clients
+- workforce-api v20 manager-only wrapper
+- successful publish creates in-app staff notification
+- shift-builder helper added
+- External LINE/push/email notification is NOT implemented
+- Netlify production unchanged

@@ -1,0 +1,16 @@
+{
+  "index.html": true,
+  "kitchen.html": true,
+  "cashier.html": true,
+  "staff.html": true,
+  "manager.html": true,
+  "inventory.html": true,
+  "hygiene.html": true,
+  "closing.html": true,
+  "today.html": true,
+  "launchpad.html": true,
+  "E2E_RUNBOOK_V26.md": true,
+  "operations_write_ui": true,
+  "closing_live_ui": true,
+  "no_service_role": true
+}

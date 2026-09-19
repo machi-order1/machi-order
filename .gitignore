@@ -1,0 +1,21 @@
+# macOS metadata
+.DS_Store
+._*
+.Spotlight-V100/
+.Trashes/
+
+# Local environment variables (keep sanitized examples trackable)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local Netlify state and dependencies
+.netlify/
+node_modules/
+
+# Logs and editor temporary files
+*.log
+*.swp
+*.swo
+*~

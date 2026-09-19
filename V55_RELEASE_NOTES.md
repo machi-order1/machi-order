@@ -1,0 +1,11 @@
+# V55 PROFIT OPS BIG BATCH
+- staff_consumption_events は賄い/スタッフ消費専用へ整理
+- actual waste は inventory_waste を唯一の廃棄台帳に統一
+- pl-api v6: waste二重計上を排除
+- pl-api v6: data_quality（商品原価登録数、未原価商品、経費/廃棄行、未原価スタッフ消費）追加
+- loss-api v1 新設
+- staff-meal.html 新設
+- 賄い/失敗品消費を数秒で記録
+- 原価が登録済みなら自動原価、未登録なら0円を確定原価扱いせず cost_complete=false
+- 日常の廃棄入力を必須にしない長浜店運用を反映
+- 本番Netlifyは未更新

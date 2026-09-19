@@ -1,0 +1,6 @@
+{
+  "attendance_state_ui": true,
+  "attendance_refresh": true,
+  "purchase_suggestions": true,
+  "purchase_location": true
+}

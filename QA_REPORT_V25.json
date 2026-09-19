@@ -1,0 +1,14 @@
+{
+  "index.html": true,
+  "today.html": true,
+  "kitchen.html": true,
+  "cashier.html": true,
+  "staff.html": true,
+  "manager.html": true,
+  "inventory.html": true,
+  "hygiene.html": true,
+  "closing.html": true,
+  "launchpad.html": true,
+  "no_service_role_key": true,
+  "acceptance_matrix": true
+}

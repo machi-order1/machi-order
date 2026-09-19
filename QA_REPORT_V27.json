@@ -1,0 +1,6 @@
+{
+  "kitchen_auto_refresh": true,
+  "kitchen_escape": true,
+  "kitchen_busy_guard": true,
+  "build_v27": true
+}

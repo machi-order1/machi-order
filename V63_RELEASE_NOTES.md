@@ -1,0 +1,12 @@
+# V63 PREMIUM KITCHEN
+- Kitchen UI rebuilt as tablet-first app screen.
+- Large seat number, elapsed minutes, item quantities and options.
+- New / cooking filters with live counts.
+- 5-second refresh using existing authenticated kitchen-api v6.
+- New-order audible cue after initial load (browser audio restrictions may apply).
+- 10+ minute orders receive stronger visual border.
+- One-tap forward-only workflow: 調理する → できた・提供へ.
+- Busy lock prevents repeated taps; backend concurrency remains authoritative.
+- Connection state and automatic retry.
+- Shared bottom app navigation.
+- Production Netlify unchanged.

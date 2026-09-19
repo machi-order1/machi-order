@@ -1,0 +1,18 @@
+
+:root{
+ --mo-bg:#f4f4f0;--mo-surface:#fff;--mo-surface-2:#ecece6;--mo-ink:#151515;
+ --mo-muted:#73736d;--mo-line:#e3e3dc;--mo-accent:#171717;--mo-on-accent:#fff;
+ --mo-radius-sm:12px;--mo-radius:20px;--mo-radius-lg:28px;
+ --mo-shadow:0 10px 30px rgba(20,20,16,.06);--mo-tap:52px;
+ --mo-space-1:4px;--mo-space-2:8px;--mo-space-3:12px;--mo-space-4:16px;--mo-space-5:24px;
+ --mo-font:-apple-system,BlinkMacSystemFont,"Noto Sans JP","Helvetica Neue",sans-serif
+}
+*{box-sizing:border-box}html{background:var(--mo-bg)}body{font-family:var(--mo-font);-webkit-font-smoothing:antialiased}
+.mo-card{background:var(--mo-surface);border:1px solid var(--mo-line);border-radius:var(--mo-radius);box-shadow:var(--mo-shadow)}
+.mo-btn{min-height:var(--mo-tap);border:0;border-radius:16px;padding:0 18px;font-weight:900;font-size:16px}
+.mo-btn-primary{background:var(--mo-accent);color:var(--mo-on-accent)}
+.mo-btn-secondary{background:var(--mo-surface-2);color:var(--mo-ink)}
+.mo-badge{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;background:var(--mo-surface-2);font-size:12px;font-weight:850}
+.mo-page{max-width:1180px;margin:auto;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+button,a,input,select{touch-action:manipulation}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--mo-ink);outline-offset:3px}
+@media(prefers-reduced-motion:no-preference){.mo-card,.mo-btn{transition:transform .14s ease,box-shadow .14s ease}.mo-btn:active{transform:scale(.985)}}

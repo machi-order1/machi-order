@@ -1,0 +1,7 @@
+{
+  "cashier_auto_refresh": true,
+  "cashier_double_guard": true,
+  "already_paid_ui": true,
+  "manager_multi_api": true,
+  "build_v28": true
+}

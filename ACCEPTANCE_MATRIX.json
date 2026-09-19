@@ -1,0 +1,34 @@
+{
+  "customer_order": {
+    "status": "ready_for_safe_test",
+    "blocker": null
+  },
+  "kitchen": {
+    "status": "ui_ready",
+    "blocker": "authenticated E2E"
+  },
+  "cashier": {
+    "status": "ui_ready",
+    "blocker": "atomic payment hardening"
+  },
+  "attendance": {
+    "status": "ui_ready",
+    "blocker": "scheduled/actual shift matching"
+  },
+  "inventory": {
+    "status": "ui_ready",
+    "blocker": "write-flow E2E"
+  },
+  "hygiene": {
+    "status": "read_ui_ready",
+    "blocker": "operations-api RLS/JWT"
+  },
+  "closing": {
+    "status": "safe_draft_ready",
+    "blocker": "closing-api E2E"
+  },
+  "manager": {
+    "status": "ui_ready",
+    "blocker": "metric reconciliation"
+  }
+}

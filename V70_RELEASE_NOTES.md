@@ -1,0 +1,11 @@
+# V70 POINT APPROVAL
+- Deployed authenticated points-api v1.
+- Staff can read only their own point ledger; managers can review store ledger.
+- Manager approval/rejection implemented.
+- Approved award creates an in-app point notification.
+- Manager GOOD manual-award endpoint validates active store membership.
+- Added evidence JSON and automatic-rule flag foundation.
+- Staff MACHI POINT page now loads approved/pending totals from live API.
+- Added manager point approval screen.
+- Automatic detection jobs for solo shift/sales threshold/5 consecutive days are NOT yet scheduled; flags define eligibility only.
+- Production Netlify unchanged.
