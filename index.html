@@ -67,21 +67,21 @@
       return (product.option_group_ids || []).map((id) => data.option_groups.find((group) => Number(group.id) === Number(id))).filter(Boolean);
     }
     const menuPhotos = {
-      1:['noodles.jpg','11% 1%','315%'],2:['noodles.jpg','73% 2%','315%'],3:['noodles.jpg','17% 28%','315%'],4:['noodles.jpg','88% 26%','315%'],
-      5:['noodles.jpg','13% 58%','315%'],6:['noodles.jpg','82% 55%','315%'],7:['noodles.jpg','67% 83%','315%'],8:['noodles.jpg','67% 83%','315%'],
-      9:['noodles.jpg','4% 100%','560%'],10:['noodles.jpg','20% 100%','560%'],11:['noodles.jpg','38% 100%','560%'],12:['noodles.jpg','54% 100%','560%'],13:['noodles.jpg','68% 100%','560%'],14:['noodles.jpg','84% 100%','560%'],15:['sets.jpg','3% 100%','520%'],
-      16:['sets.jpg','17% 2%','300%'],17:['sets.jpg','82% 4%','300%'],18:['sets.jpg','17% 43%','300%'],19:['sets.jpg','80% 46%','300%'],20:['sets.jpg','43% 72%','300%'],
-      21:['sets.jpg','20% 100%','520%'],22:['sets.jpg','38% 100%','520%'],23:['sets.jpg','58% 100%','520%'],24:['sets.jpg','76% 100%','520%'],25:['sets.jpg','96% 100%','520%'],
-      26:['sets.jpg','10% 2%','340%'],27:['sets.jpg','67% 51%','340%'],28:['sets.jpg','67% 51%','340%'],
-      29:['drinks.jpg','13% 30%','300%'],30:['drinks.jpg','70% 27%','300%'],31:['drinks.jpg','13% 58%','300%'],32:['drinks.jpg','70% 58%','300%'],33:['drinks.jpg','70% 58%','300%'],34:['drinks.jpg','70% 58%','300%'],
-      35:['drinks.jpg','2% 91%','530%'],36:['drinks.jpg','25% 91%','530%'],37:['drinks.jpg','51% 91%','530%'],38:['drinks.jpg','75% 91%','530%'],39:['drinks.jpg','98% 91%','530%']
+      1:'hakata-aburasoba.webp', 2:'ebi-shio-aburasoba.webp', 3:'iki-beef-hakata.webp', 4:'iki-beef-ebi-shio.webp',
+      5:'chashu-hakata.webp', 6:'chashu-ebi-shio.webp', 7:'double-aburasoba.webp', 8:'double-aburasoba.webp',
+      9:'extra-chashu.webp', 10:'takana.webp', 11:'spicy-takana.webp', 12:'raw-egg.webp',
+      13:'half-boiled-egg.webp', 14:'iki-premium-beef.webp', 15:'dashi.webp',
+      16:'set-a.webp', 17:'set-b.webp', 18:'set-c.webp', 19:'set-d.webp', 20:'set-e.webp',
+      21:'dumplings-3.webp', 22:'dumplings-5.webp', 23:'edamame.webp', 24:'iriko-mayo.webp', 25:'grilled-chashu.webp',
+      29:'beer.webp', 30:'highball.webp', 31:'lemon-sour.webp',
+      32:'shochu.webp', 33:'shochu.webp', 34:'shochu.webp',
+      35:'cola.webp', 36:'ginger-ale.webp', 37:'orange-juice.webp', 38:'calpis.webp', 39:'oolong-tea.webp'
     };
     function productPhoto(product) {
       if (product.image_url) return `<div class="photo"><img src="${Machi.escapeHtml(product.image_url)}" alt="${Machi.escapeHtml(product.name)}" loading="lazy"></div>`;
       const photo = menuPhotos[Number(product.id)];
       if (!photo) return '<div class="photo">商品写真<br>準備中</div>';
-      const [file, position, size] = photo;
-      return `<div class="photo" role="img" aria-label="${Machi.escapeHtml(product.name)}" style="background-image:url('/assets/menu/${file}');background-position:${position};background-size:${size} auto"></div>`;
+      return `<div class="photo"><img src="/assets/menu-items/web/${photo}" alt="${Machi.escapeHtml(product.name)}" width="720" height="720" loading="lazy" decoding="async"></div>`;
     }
     function optionDetails(ids) {
       const found = [];
