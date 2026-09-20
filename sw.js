@@ -1,7 +1,8 @@
-const C='machi-order-v71-4';
+const C='machi-order-v71-5';
 const A=[
   '/index.html','/order-entry.html','/staff-order.html','/launchpad.html','/store-command.html','/kitchen.html','/cashier.html','/today.html','/staff.html',
   '/machi-app.js','/machi-design-system.css','/machi-ui-config.js','/manifest.webmanifest',
+  '/assets/brand/151-logo-white.webp',
   '/assets/menu-items/web/hakata-aburasoba.webp','/assets/menu-items/web/ebi-shio-aburasoba.webp','/assets/menu-items/web/iki-beef-hakata.webp','/assets/menu-items/web/iki-beef-ebi-shio.webp',
   '/assets/menu-items/web/chashu-hakata.webp','/assets/menu-items/web/chashu-ebi-shio.webp','/assets/menu-items/web/double-aburasoba.webp',
   '/assets/menu-items/web/extra-chashu.webp','/assets/menu-items/web/takana.webp','/assets/menu-items/web/spicy-takana.webp','/assets/menu-items/web/raw-egg.webp','/assets/menu-items/web/half-boiled-egg.webp','/assets/menu-items/web/iki-premium-beef.webp','/assets/menu-items/web/dashi.webp',
