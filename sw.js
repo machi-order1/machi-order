@@ -1,4 +1,4 @@
-const C='machi-order-v71';
+const C='machi-order-v71-1';
 const A=['/index.html','/order-entry.html','/staff-order.html','/launchpad.html','/store-command.html','/kitchen.html','/cashier.html','/today.html','/staff.html','/machi-app.js','/machi-design-system.css','/machi-ui-config.js','/manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(C).then(cache=>cache.addAll(A)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==C).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));

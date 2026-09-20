@@ -52,7 +52,15 @@
     addEventListener('offline', setNetworkState);
     setNetworkState();
 
-    function rootCategories() { return (data.categories || []).filter((item) => !item.parent_id); }
+    function displayCategories() {
+      const categories = data.categories || [];
+      return categories.filter((item) => !item.parent_id).flatMap((root) => {
+        const children = categories
+          .filter((item) => Number(item.parent_id) === Number(root.id))
+          .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+        return children.length ? children : [root];
+      });
+    }
     function productGroups(product) {
       return (product.option_group_ids || []).map((id) => data.option_groups.find((group) => Number(group.id) === Number(id))).filter(Boolean);
     }
@@ -78,8 +86,8 @@
     }
 
     function renderMenu() {
-      $('tabs').innerHTML = rootCategories().map((category, index) => `<button class="tab ${index === 0 ? 'active' : ''}" data-cat="${Number(category.id)}">${Machi.escapeHtml(category.name)}</button>`).join('');
-      $('menu').innerHTML = rootCategories().map((category) => {
+      $('tabs').innerHTML = displayCategories().map((category, index) => `<button class="tab ${index === 0 ? 'active' : ''}" data-cat="${Number(category.id)}">${Machi.escapeHtml(category.name)}</button>`).join('');
+      $('menu').innerHTML = displayCategories().map((category) => {
         const ids = (data.categories || []).filter((item) => Number(item.id) === Number(category.id) || Number(item.parent_id) === Number(category.id)).map((item) => Number(item.id));
         const products = (data.products || []).filter((product) => ids.includes(Number(product.category_id)));
         return `<section id="c${Number(category.id)}"><h2>${Machi.escapeHtml(category.name)}</h2>${products.map(productCard).join('')}</section>`;
