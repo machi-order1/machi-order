@@ -1,4 +1,4 @@
-const C='machi-order-v71-3';
+const C='machi-order-v71-4';
 const A=[
   '/index.html','/order-entry.html','/staff-order.html','/launchpad.html','/store-command.html','/kitchen.html','/cashier.html','/today.html','/staff.html',
   '/machi-app.js','/machi-design-system.css','/machi-ui-config.js','/manifest.webmanifest',
@@ -7,6 +7,7 @@ const A=[
   '/assets/menu-items/web/extra-chashu.webp','/assets/menu-items/web/takana.webp','/assets/menu-items/web/spicy-takana.webp','/assets/menu-items/web/raw-egg.webp','/assets/menu-items/web/half-boiled-egg.webp','/assets/menu-items/web/iki-premium-beef.webp','/assets/menu-items/web/dashi.webp',
   '/assets/menu-items/web/set-a.webp','/assets/menu-items/web/set-b.webp','/assets/menu-items/web/set-c.webp','/assets/menu-items/web/set-d.webp','/assets/menu-items/web/set-e.webp',
   '/assets/menu-items/web/dumplings-3.webp','/assets/menu-items/web/dumplings-5.webp','/assets/menu-items/web/edamame.webp','/assets/menu-items/web/iriko-mayo.webp','/assets/menu-items/web/grilled-chashu.webp',
+  '/assets/menu-items/web/chashu-don.webp','/assets/menu-items/web/soup-dumplings-3.webp','/assets/menu-items/web/soup-dumplings-5.webp',
   '/assets/menu-items/web/beer.webp','/assets/menu-items/web/highball.webp','/assets/menu-items/web/lemon-sour.webp','/assets/menu-items/web/shochu.webp',
   '/assets/menu-items/web/cola.webp','/assets/menu-items/web/ginger-ale.webp','/assets/menu-items/web/orange-juice.webp','/assets/menu-items/web/calpis.webp','/assets/menu-items/web/oolong-tea.webp'
 ];
