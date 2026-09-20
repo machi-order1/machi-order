@@ -28,6 +28,7 @@
     'use strict';
     const q = new URLSearchParams(location.search);
     const seatToken = q.get('t') || '';
+    const orderChannel = q.get('channel') === 'staff' ? 'staff' : 'qr';
     const testMode = q.get('test') === '1';
     const cartKey = `machi_cart_v71:${seatToken || 'missing'}`;
     const pendingKey = `machi_pending_order_v71:${seatToken || 'missing'}`;
@@ -71,6 +72,7 @@
       $('brand').textContent = data.brand || '博多油そば151';
       $('place').textContent = `${data.store || Machi.store().name} ／ 席 ${data.table || '-'} ／ ${(data.products || []).length}商品`;
       renderMenu();
+      if (orderChannel === 'staff') $('menu').insertAdjacentHTML('afterbegin', '<div class="notice"><b>スタッフ口頭注文</b><br>席と注文内容をお客様と確認して送信してください。</div>');
       updateCart();
       showPendingWarning();
     }
@@ -171,7 +173,7 @@
       const requestId = Machi.createId('customer');
       localStorage.setItem(pendingKey, JSON.stringify({ request_id: requestId, created_at: new Date().toISOString(), items: cart }));
       try {
-        const result = await Machi.api('menu-api', { method: 'POST', token: '', body: { token: seatToken, request_id: requestId, items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, option_ids: item.option_ids })) } });
+        const result = await Machi.api('menu-api', { method: 'POST', token: '', body: { token: seatToken, request_id: requestId, channel: orderChannel, items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, option_ids: item.option_ids })) } });
         localStorage.removeItem(pendingKey);
         cart = [];
         saveCart();
