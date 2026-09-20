@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>博多油そば151｜ご注文</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f5f2ec;color:#171717;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}button{font:inherit}header{background:#111;color:#fff;padding:26px 20px}.logo{font-size:12px;letter-spacing:.2em;color:#bbb;font-weight:800}h1{margin:9px 0 4px;font-size:27px}.place{color:#ddd;font-size:14px}.version{font-size:10px;color:#777;margin-top:7px;letter-spacing:.12em}main{max-width:760px;margin:auto;padding:0 14px 110px}.tabs{display:flex;gap:8px;overflow:auto;position:sticky;top:0;z-index:9;background:#f5f2ec;padding:10px 0 12px}.tab,.choice{border:0;background:#fff;padding:12px 16px;border-radius:22px;white-space:nowrap}.tab.active{background:#111;color:#fff}.card{background:#fff;border-radius:18px;padding:16px;margin:10px 0;cursor:pointer}.card:active{transform:scale(.99)}.card.sold{opacity:.5;cursor:default}.row{display:flex;justify-content:space-between;gap:12px;align-items:center}.product{min-width:0;flex:1}.name{font-size:18px;font-weight:850}.desc{font-size:13px;color:#666;margin-top:5px;line-height:1.45}.price{font-size:20px;font-weight:950;white-space:nowrap}.add,.order{border:0;background:#111;color:#fff;border-radius:13px;padding:12px 15px;font-weight:900}.add{margin-top:8px}.photo{width:82px;height:82px;border-radius:14px;background:#eee8dd;display:flex;align-items:center;justify-content:center;color:#857d72;font-size:11px;text-align:center;overflow:hidden;flex:0 0 auto}.photo img{width:100%;height:100%;object-fit:cover}section{scroll-margin-top:72px}.cart{position:fixed;bottom:12px;left:12px;right:12px;max-width:736px;margin:auto;background:#111;color:#fff;padding:14px 18px;border-radius:18px;display:flex;justify-content:space-between;align-items:center;z-index:10;box-shadow:0 8px 32px #0004}.hidden{display:none!important}.modal{position:fixed;inset:0;background:#0009;display:flex;align-items:flex-end;z-index:20}.sheet{background:#fff;width:100%;padding:22px max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));border-radius:22px 22px 0 0;max-height:90vh;overflow:auto}.choice{display:block;width:100%;text-align:left;background:#f1eee8;margin:8px 0;border:2px solid transparent;font-size:16px}.choice.sel{border-color:#111}.order{width:100%;font-size:18px;margin-top:14px;min-height:54px}.order:disabled{opacity:.5}.qtyrow{display:flex;align-items:center;gap:12px}.mini{border:0;background:#eee;border-radius:9px;padding:9px 13px;font-weight:900}.success{font-size:54px;text-align:center}.net{position:fixed;top:8px;right:8px;z-index:30;font-size:11px;font-weight:900;padding:6px 9px;border-radius:999px;background:#8b1e16;color:#fff;box-shadow:0 2px 10px #0002}.notice{background:#fff5d9;border-radius:13px;padding:12px 14px;margin:10px 0;font-size:13px;line-height:1.55}.danger{background:#fde8e5}.retry{border:0;background:#111;color:#fff;border-radius:12px;padding:11px 14px;font-weight:800;margin-top:12px}
+  </style>
+  <script src="/machi-app.js"></script>
+</head>
+<body>
+  <div id="net" class="net hidden">オフライン</div>
+  <header>
+    <div class="logo">MACHI ORDER</div>
+    <h1 id="brand">読み込み中…</h1>
+    <div id="place" class="place"></div>
+    <div class="version">V71 長浜実戦統合版</div>
+  </header>
+  <main><div id="tabs" class="tabs"></div><div id="menu"></div></main>
+  <div id="cartbar" class="cart hidden"><b id="sum"></b><button id="open-cart" class="tab">カートを見る</button></div>
+  <div id="modal" class="hidden"></div>
+
+  <script>
+  (() => {
+    'use strict';
+    const q = new URLSearchParams(location.search);
+    const seatToken = q.get('t') || '';
+    const testMode = q.get('test') === '1';
+    const cartKey = `machi_cart_v71:${seatToken || 'missing'}`;
+    const pendingKey = `machi_pending_order_v71:${seatToken || 'missing'}`;
+    const $ = (id) => document.getElementById(id);
+    let data = null;
+    let cart = restoreCart();
+    let current = null;
+    let selected = {};
+    let quantity = 1;
+    let sending = false;
+
+    function restoreCart() {
+      try {
+        const value = JSON.parse(localStorage.getItem(cartKey) || '[]');
+        return Array.isArray(value) ? value : [];
+      } catch { return []; }
+    }
+    function saveCart() { localStorage.setItem(cartKey, JSON.stringify(cart)); }
+    function setNetworkState() { $('net').classList.toggle('hidden', navigator.onLine); }
+    addEventListener('online', setNetworkState);
+    addEventListener('offline', setNetworkState);
+    setNetworkState();
+
+    function rootCategories() { return (data.categories || []).filter((item) => !item.parent_id); }
+    function productGroups(product) {
+      return (product.option_group_ids || []).map((id) => data.option_groups.find((group) => Number(group.id) === Number(id))).filter(Boolean);
+    }
+    function optionDetails(ids) {
+      const found = [];
+      for (const id of ids) for (const group of data.option_groups || []) {
+        const option = (group.options || []).find((item) => Number(item.id) === Number(id));
+        if (option) found.push(option);
+      }
+      return found;
+    }
+    function optionDelta() { return optionDetails(Object.values(selected).flat()).reduce((sum, item) => sum + Number(item.price_delta || 0), 0); }
+
+    async function load() {
+      if (!seatToken) throw new Error('席のQRコードから開いてください。');
+      data = await Machi.api('menu-api', { params: { t: seatToken }, token: '' });
+      $('brand').textContent = data.brand || '博多油そば151';
+      $('place').textContent = `${data.store || Machi.store().name} ／ 席 ${data.table || '-'} ／ ${(data.products || []).length}商品`;
+      renderMenu();
+      updateCart();
+      showPendingWarning();
+    }
+
+    function renderMenu() {
+      $('tabs').innerHTML = rootCategories().map((category, index) => `<button class="tab ${index === 0 ? 'active' : ''}" data-cat="${Number(category.id)}">${Machi.escapeHtml(category.name)}</button>`).join('');
+      $('menu').innerHTML = rootCategories().map((category) => {
+        const ids = (data.categories || []).filter((item) => Number(item.id) === Number(category.id) || Number(item.parent_id) === Number(category.id)).map((item) => Number(item.id));
+        const products = (data.products || []).filter((product) => ids.includes(Number(product.category_id)));
+        return `<section id="c${Number(category.id)}"><h2>${Machi.escapeHtml(category.name)}</h2>${products.map(productCard).join('')}</section>`;
+      }).join('');
+      document.querySelectorAll('[data-cat]').forEach((button) => button.onclick = () => goCategory(Number(button.dataset.cat)));
+      document.querySelectorAll('[data-product]').forEach((element) => element.onclick = () => pick(Number(element.dataset.product)));
+      observeSections();
+    }
+
+    function productCard(product) {
+      const sold = product.sale_status !== 'available';
+      const image = product.image_url ? `<img src="${Machi.escapeHtml(product.image_url)}" alt="" loading="lazy">` : '商品写真<br>準備中';
+      return `<article class="card ${sold ? 'sold' : ''}" ${sold ? '' : `data-product="${Number(product.id)}"`}><div class="row"><div class="photo">${image}</div><div class="product"><div class="name">${Machi.escapeHtml(product.name)}</div>${product.description ? `<div class="desc">${Machi.escapeHtml(product.description)}</div>` : ''}<div class="desc">${sold ? '本日売り切れ' : 'タップして選択'}</div></div><div><div class="price">${Machi.yen(product.price)}</div><button class="add" ${sold ? 'disabled' : ''}>${sold ? '売切' : '選ぶ'}</button></div></div></article>`;
+    }
+
+    function goCategory(id) {
+      document.querySelectorAll('[data-cat]').forEach((button) => button.classList.toggle('active', Number(button.dataset.cat) === id));
+      const target = $(`c${id}`);
+      if (target) window.scrollTo({ top: Math.max(0, scrollY + target.getBoundingClientRect().top - $('tabs').offsetHeight - 8), behavior: 'smooth' });
+    }
+    function observeSections() {
+      if (!('IntersectionObserver' in window)) return;
+      const observer = new IntersectionObserver((entries) => {
+        const hit = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!hit) return;
+        const id = Number(hit.target.id.slice(1));
+        document.querySelectorAll('[data-cat]').forEach((button) => button.classList.toggle('active', Number(button.dataset.cat) === id));
+      }, { rootMargin: '-72px 0px -60% 0px', threshold: [0, .1, .5] });
+      document.querySelectorAll('section[id^="c"]').forEach((section) => observer.observe(section));
+    }
+
+    function pick(id) {
+      current = data.products.find((product) => Number(product.id) === id);
+      if (!current) return;
+      selected = {};
+      productGroups(current).forEach((group) => selected[group.id] = []);
+      quantity = 1;
+      drawProduct();
+    }
+    function drawProduct() {
+      const unit = Number(current.price) + optionDelta();
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><div class="row"><h2>${Machi.escapeHtml(current.name)}</h2><div class="price">${Machi.yen(unit)}</div></div>${productGroups(current).map((group) => `<h3>${Machi.escapeHtml(group.name)}${group.required ? '（必須）' : ''}</h3>${(group.options || []).map((option) => `<button class="choice ${(selected[group.id] || []).includes(option.id) ? 'sel' : ''}" data-group="${Number(group.id)}" data-option="${Number(option.id)}" data-max="${Number(group.max_select || 1)}">${Machi.escapeHtml(option.name)} ${Number(option.price_delta) ? `+${Machi.yen(option.price_delta)}` : ''}</button>`).join('')}`).join('')}<h3>数量</h3><div class="qtyrow"><button class="mini" data-qty="-1">−</button><b>${quantity}</b><button class="mini" data-qty="1">＋</button></div><button id="add-item" class="order">${Machi.yen(unit * quantity)}　カートに追加</button><button id="close-modal" class="choice">閉じる</button></div>`;
+      document.querySelectorAll('[data-group]').forEach((button) => button.onclick = () => toggleOption(Number(button.dataset.group), Number(button.dataset.option), Number(button.dataset.max)));
+      document.querySelectorAll('[data-qty]').forEach((button) => button.onclick = () => { quantity = Math.max(1, Math.min(20, quantity + Number(button.dataset.qty))); drawProduct(); });
+      $('add-item').onclick = addItem;
+      $('close-modal').onclick = closeModal;
+    }
+    function toggleOption(groupId, optionId, max) {
+      const values = selected[groupId] || [];
+      selected[groupId] = values.includes(optionId) ? values.filter((id) => id !== optionId) : max === 1 ? [optionId] : [...values, optionId];
+      drawProduct();
+    }
+    function addItem() {
+      for (const group of productGroups(current)) {
+        const minimum = Number(group.min_select || (group.required ? 1 : 0));
+        if ((selected[group.id] || []).length < minimum) return alert(`${group.name}を選んでください`);
+      }
+      const optionIds = Object.values(selected).flat();
+      cart.push({ product_id: current.id, quantity, option_ids: optionIds, option_names: optionDetails(optionIds).map((item) => item.name), name: current.name, price: Number(current.price) + optionDelta() });
+      saveCart();
+      updateCart();
+      closeModal();
+    }
+    function updateCart() {
+      const count = cart.reduce((sum, item) => sum + Number(item.quantity), 0);
+      const total = cart.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+      $('cartbar').classList.toggle('hidden', !count);
+      $('sum').textContent = `${count}点　${Machi.yen(total)}`;
+    }
+    function showCart() {
+      const total = cart.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><h2>ご注文内容</h2>${cart.map((item, index) => `<div class="card row"><div><b>${Machi.escapeHtml(item.name)}</b>${item.option_names?.length ? `<div class="desc">${item.option_names.map(Machi.escapeHtml).join(' / ')}</div>` : ''}<div>${item.quantity}点 × ${Machi.yen(item.price)}</div><div class="qtyrow"><button class="mini" data-cart-qty="${index}:-1">−</button><b>${item.quantity}</b><button class="mini" data-cart-qty="${index}:1">＋</button></div></div><button class="mini" data-remove="${index}">削除</button></div>`).join('')}<h2>合計 ${Machi.yen(total)}</h2><button id="send-order" class="order">この内容で注文する</button><button id="close-modal" class="choice">戻る</button></div>`;
+      document.querySelectorAll('[data-cart-qty]').forEach((button) => button.onclick = () => { const [index, delta] = button.dataset.cartQty.split(':').map(Number); cart[index].quantity = Math.max(0, Number(cart[index].quantity) + delta); if (!cart[index].quantity) cart.splice(index, 1); saveCart(); updateCart(); showCart(); });
+      document.querySelectorAll('[data-remove]').forEach((button) => button.onclick = () => { cart.splice(Number(button.dataset.remove), 1); saveCart(); updateCart(); showCart(); });
+      $('send-order').onclick = order;
+      $('close-modal').onclick = closeModal;
+    }
+
+    async function order() {
+      if (!cart.length || sending) return;
+      if (testMode) return showSuccess({ test: true });
+      if (!navigator.onLine) return alert('オフラインです。通信が戻ってから注文してください。');
+      if (localStorage.getItem(pendingKey)) return showPendingWarning(true);
+      if (!confirm('この内容で注文を確定しますか？')) return;
+      sending = true;
+      const button = $('send-order');
+      button.disabled = true;
+      button.textContent = '送信中…';
+      const requestId = Machi.createId('customer');
+      localStorage.setItem(pendingKey, JSON.stringify({ request_id: requestId, created_at: new Date().toISOString(), items: cart }));
+      try {
+        const result = await Machi.api('menu-api', { method: 'POST', token: '', body: { token: seatToken, request_id: requestId, items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, option_ids: item.option_ids })) } });
+        localStorage.removeItem(pendingKey);
+        cart = [];
+        saveCart();
+        updateCart();
+        showSuccess(result);
+      } catch (error) {
+        showAmbiguousFailure(error);
+      } finally { sending = false; }
+    }
+    function showSuccess(result) {
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><div class="success">✓</div><h2 style="text-align:center">${result.test ? 'テスト確認OK' : 'ご注文ありがとうございます！'}</h2><div class="card">${result.test ? '実注文は送信していません。' : `注文番号 #${Machi.escapeHtml(result.order_id || '-')}${result.total !== undefined ? `<br><b>合計 ${Machi.yen(result.total)}</b>` : ''}<br>厨房へ注文を送信しました。`}</div><button id="close-modal" class="order">メニューへ戻る</button></div>`;
+      $('close-modal').onclick = closeModal;
+    }
+    function showAmbiguousFailure(error) {
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><div class="notice danger"><b>注文状況を確認しています</b><br>二重注文防止のため、自動で再送信はしません。店員に画面を見せて、厨房へ届いているか確認してください。</div><div class="desc">${Machi.escapeHtml(error.message)}</div><button id="checked-order" class="order">店員と確認した</button></div>`;
+      $('checked-order').onclick = () => { localStorage.removeItem(pendingKey); closeModal(); showCart(); };
+    }
+    function showPendingWarning(force) {
+      if (!localStorage.getItem(pendingKey)) return;
+      if (force) alert('直前の注文が厨房へ届いている可能性があります。店員に確認してください。');
+      $('menu').insertAdjacentHTML('afterbegin', '<div class="notice danger"><b>直前の注文を確認中です。</b><br>二重送信を防ぐため、店員へお声がけください。</div>');
+    }
+    function closeModal() { $('modal').className = 'hidden'; $('modal').innerHTML = ''; }
+    $('open-cart').onclick = showCart;
+    load().catch((error) => {
+      $('brand').textContent = '読み込みできませんでした';
+      $('menu').innerHTML = `<div class="card"><div class="name">${Machi.escapeHtml(error.message)}</div><button class="retry" onclick="location.reload()">再読み込み</button></div>`;
+    });
+    Machi.registerServiceWorker();
+  })();
+  </script>
+</body>
+</html>

@@ -19,3 +19,6 @@ node_modules/
 *.swp
 *.swo
 *~
+
+# Recovered historical packages used only during V71 migration
+legacy/
