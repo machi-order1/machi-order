@@ -44,8 +44,24 @@ Deno.serve(async (req: Request) => {
       if (statusError) throw statusError
       const { data: rules, error: rulesError } = await sb.from('price_rules').select('id,product_id,name,price,start_time,end_time,days_of_week,active').eq('store_id', storeId).order('id')
       if (rulesError) throw rulesError
+      const { count: activeTableCount, error: tableError } = await sb.from('dining_tables').select('id', { count: 'exact', head: true }).eq('store_id', storeId).eq('active', true)
+      if (tableError) throw tableError
       const statusMap = new Map((statuses || []).map((s: any) => [Number(s.product_id), s]))
-      return json({ store: { id: store.id, name: store.name }, role: membership.role, can_edit_happy_hour: managerRoles.has(membership.role), categories: categories || [], products: (products || []).map((p: any) => ({ ...p, sale_status: statusMap.get(Number(p.id))?.sale_status || 'available' })), price_rules: rules || [] })
+      return json({
+        store: { id: store.id, name: store.name },
+        role: membership.role,
+        can_edit_happy_hour: managerRoles.has(membership.role),
+        diagnostics: {
+          active_table_count: activeTableCount || 0,
+          active_product_count: (products || []).length,
+          customer_visible_product_count: (products || []).filter((p: any) => p.customer_visible).length,
+          unavailable_product_count: (products || []).filter((p: any) => (statusMap.get(Number(p.id))?.sale_status || 'available') !== 'available').length,
+          active_price_rule_count: (rules || []).filter((r: any) => r.active).length,
+        },
+        categories: categories || [],
+        products: (products || []).map((p: any) => ({ ...p, sale_status: statusMap.get(Number(p.id))?.sale_status || 'available' })),
+        price_rules: rules || [],
+      })
     }
 
     const action = String(body.action || '')
