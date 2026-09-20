@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>スタッフログイン｜MACHI ORDER</title>
   <style>
-    *{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#f7f3ee;color:#151515;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;display:grid;place-items:center;padding:20px}.box{width:min(100%,440px);background:#fff;border-radius:26px;overflow:hidden;box-shadow:0 18px 60px #3a0b0b20}.brand{background:#e51b23;color:#fff;padding:28px 24px}.brand small{font-weight:900;letter-spacing:.16em}.brand h1{font-size:30px;margin:8px 0 0}.form{padding:24px}.lead{margin:0 0 18px;color:#555;line-height:1.6}.field{display:block;font-size:13px;font-weight:900;margin:14px 0 6px}input{width:100%;min-height:54px;border:1px solid #d8d2cc;border-radius:14px;padding:0 14px;font-size:16px;background:#fff}button{width:100%;min-height:56px;border:0;border-radius:15px;background:#171717;color:#fff;font-size:17px;font-weight:950;margin-top:18px}button:disabled{opacity:.55}.msg{min-height:24px;margin:14px 2px 0;color:#c5161d;font-size:14px;font-weight:750}.note{border-top:1px solid #eee;padding:16px 24px 22px;color:#777;font-size:12px;line-height:1.6}
+    *{box-sizing:border-box}body{margin:0;min-height:100dvh;background:#f7f3ee;color:#151515;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;display:grid;place-items:center;padding:20px}.box{width:min(100%,440px);background:#fff;border-radius:26px;overflow:hidden;box-shadow:0 18px 60px #3a0b0b20}.brand{background:#e51b23;color:#fff;padding:28px 24px}.brand small{font-weight:900;letter-spacing:.16em}.brand h1{font-size:30px;margin:8px 0 0}.form{padding:24px}.lead{margin:0 0 18px;color:#555;line-height:1.6}.field{display:block;font-size:13px;font-weight:900;margin:14px 0 6px}input{width:100%;min-height:54px;border:1px solid #d8d2cc;border-radius:14px;padding:0 14px;font-size:16px;background:#fff}button{width:100%;min-height:56px;border:0;border-radius:15px;background:#171717;color:#fff;font-size:17px;font-weight:950;margin-top:18px}button.secondary{min-height:48px;margin-top:10px;background:#fff;color:#b71920;border:2px solid #e51b23;font-size:15px}button:disabled{opacity:.55}.msg{min-height:24px;margin:14px 2px 0;color:#c5161d;font-size:14px;font-weight:750;line-height:1.5}.msg.ok{color:#16733b}.note{border-top:1px solid #eee;padding:16px 24px 22px;color:#777;font-size:12px;line-height:1.6}
   </style>
 </head>
 <body>
@@ -20,6 +20,7 @@
       <label class="field" for="password">パスワード</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required>
       <button id="submit" type="submit">ログインして厨房を開く</button>
+      <button class="secondary" id="reset" type="button">パスワードを再設定する</button>
       <div class="msg" id="message" role="alert"></div>
     </form>
     <div class="note">この端末だけにログイン情報を保存します。共用端末を入れ替える場合は、厨房画面からログアウトしてください。</div>
@@ -35,12 +36,25 @@
       localStorage.setItem('machi_token_expires_at',String(Date.now()+Math.max(60,Number(j.expires_in)||3600)*1000));
     }
     document.getElementById('login-form').addEventListener('submit',async e=>{
-      e.preventDefault();const b=document.getElementById('submit'),m=document.getElementById('message');b.disabled=true;b.textContent='確認しています…';m.textContent='';
+      e.preventDefault();const b=document.getElementById('submit'),m=document.getElementById('message');b.disabled=true;b.textContent='確認しています…';m.className='msg';m.textContent='';
       try{
         const r=await fetch(SUPABASE+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value})});
-        const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error_description||j.msg||'メールアドレスまたはパスワードが違います');
+        const j=await r.json().catch(()=>({}));if(!r.ok){const raw=j.error_description||j.msg||'';throw Error(/invalid login credentials/i.test(raw)?'パスワードが違います。下の「パスワードを再設定する」を押してください。':raw||'メールアドレスまたはパスワードが違います')}
         saveSession(j);location.replace(next);
       }catch(err){m.textContent=err.message||'ログインできませんでした';b.disabled=false;b.textContent='ログインして厨房を開く'}
+    });
+    document.getElementById('reset').addEventListener('click',async()=>{
+      const b=document.getElementById('reset'),m=document.getElementById('message'),email=document.getElementById('email').value.trim();
+      m.className='msg';m.textContent='';
+      if(!email){m.textContent='メールアドレスを入力してください';return}
+      b.disabled=true;b.textContent='再設定メールを送っています…';
+      try{
+        const redirectTo=location.origin+'/reset-password.html';
+        const r=await fetch(SUPABASE+'/auth/v1/recover?redirect_to='+encodeURIComponent(redirectTo),{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email})});
+        const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.msg||j.error_description||'再設定メールを送れませんでした');
+        m.className='msg ok';m.textContent='再設定メールを送りました。メールを開いて、赤いボタンを押してください。';
+      }catch(err){m.textContent=err.message||'再設定メールを送れませんでした'}
+      finally{b.disabled=false;b.textContent='パスワードを再設定する'}
     });
   </script>
 </body>
