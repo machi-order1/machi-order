@@ -21,10 +21,12 @@ Deno.serve(async (request: Request) => {
     const companyId = (store as any)?.brands?.company_id
     if (!companyId) return O({ error: '店舗設定が見つかりません' }, 404)
     if (request.method === 'GET') {
-      const [{ data: items }, { data: movements }, { data: counts }] = await Promise.all([
+      const [{ data: items }, { data: movements }, { data: counts }, { data: lots }, { data: prepTasks }] = await Promise.all([
         sb.from('inventory_items').select('*').eq('company_id', companyId).eq('active', true).order('sort_order').order('name'),
         sb.from('inventory_movements').select('inventory_item_id,quantity,occurred_at').eq('store_id', storeId),
         sb.from('inventory_counts').select('inventory_item_id,quantity,counted_at').eq('store_id', storeId).order('counted_at', { ascending: false }),
+        sb.from('inventory_lots').select('id,inventory_item_id,quantity,received_on,expires_on,lot_code,status,prepared_at,prepared_by,prep_task_id').eq('store_id', storeId).eq('status', 'active').gt('quantity', 0).order('expires_on', { ascending: true, nullsFirst: false }).order('created_at'),
+        sb.from('prep_tasks').select('id,business_date,completed_quantity,completed_at,note,input_item_id,input_quantity,output_item_id,output_lot_id,expires_on,assigned_user_id').eq('store_id', storeId).eq('status', 'done').order('completed_at', { ascending: false }).limit(20),
       ])
       const latest = new Map<number, any>()
       for (const count of counts || []) if (!latest.has(count.inventory_item_id)) latest.set(count.inventory_item_id, count)
@@ -36,10 +38,32 @@ Deno.serve(async (request: Request) => {
         const suggestion = stock !== null && item.par_level != null ? Math.max(0, Number(item.par_level) - stock) : 0
         return { ...item, stock_quantity: stock, stock_known: stock !== null, last_counted_at: count?.counted_at || null, needs_reorder: needsReorder, suggested_purchase_quantity: needsReorder ? suggestion : 0 }
       })
-      return O({ store: { id: storeId, name: (store as any)?.name || '店舗' }, can_manage_items: ['owner','admin','manager'].includes(membership.role), items: output, reorder_suggestions: output.filter((item: any) => item.needs_reorder).map((item: any) => ({ inventory_item_id: item.id, name: item.name, current_stock: item.stock_quantity, reorder_level: item.reorder_level, par_level: item.par_level, suggested_quantity: item.suggested_purchase_quantity, unit: item.unit, purchase_location: item.purchase_location })) })
+      const names = new Map((items || []).map((item: any) => [item.id, { name: item.name, unit: item.unit, item_type: item.item_type }]))
+      const lotOutput = (lots || []).map((lot: any) => ({ ...lot, ...(names.get(lot.inventory_item_id) || {}) }))
+      const prepOutput = (prepTasks || []).map((task: any) => ({ ...task, input_name: names.get(task.input_item_id)?.name || '', input_unit: names.get(task.input_item_id)?.unit || '', output_name: names.get(task.output_item_id)?.name || '', output_unit: names.get(task.output_item_id)?.unit || '' }))
+      return O({ store: { id: storeId, name: (store as any)?.name || '店舗' }, can_manage_items: ['owner','admin','manager'].includes(membership.role), items: output, lots: lotOutput, prep_history: prepOutput, reorder_suggestions: output.filter((item: any) => item.needs_reorder).map((item: any) => ({ inventory_item_id: item.id, name: item.name, current_stock: item.stock_quantity, reorder_level: item.reorder_level, par_level: item.par_level, suggested_quantity: item.suggested_purchase_quantity, unit: item.unit, purchase_location: item.purchase_location })) })
     }
     if (request.method !== 'POST') return O({ error: 'Method not allowed' }, 405)
     const body = await request.json().catch(() => ({}))
+    if (body.action === 'prep_complete') {
+      const inputItemId = Number(body.input_item_id), outputItemId = Number(body.output_item_id), inputQuantity = Number(body.input_quantity), outputQuantity = Number(body.output_quantity)
+      if (![inputItemId, outputItemId].every((value) => Number.isInteger(value) && value > 0) || ![inputQuantity, outputQuantity].every((value) => Number.isFinite(value) && value > 0)) return O({ error: '仕込み品目と数量を確認してください' }, 400)
+      const expiresOn = body.expires_on ? String(body.expires_on) : null
+      if (expiresOn && !/^\d{4}-\d{2}-\d{2}$/.test(expiresOn)) return O({ error: '消費期限が正しくありません' }, 400)
+      const { data, error } = await sb.rpc('complete_inventory_prep', { p_store_id: storeId, p_input_item_id: inputItemId, p_input_quantity: inputQuantity, p_output_item_id: outputItemId, p_output_quantity: outputQuantity, p_expires_on: expiresOn, p_user_id: user.id, p_note: body.note ? String(body.note).slice(0, 500) : null })
+      if (error) return O({ error: error.message || '仕込みを記録できませんでした' }, 400)
+      await sb.from('audit_logs').insert({ store_id: storeId, user_id: user.id, action: 'inventory_prep_completed', entity_type: 'prep_task', entity_id: String(data?.task_id || ''), details: { input_item_id: inputItemId, input_quantity: inputQuantity, output_item_id: outputItemId, output_quantity: outputQuantity, expires_on: data?.expires_on || expiresOn } })
+      return O({ ok: true, prep: data })
+    }
+    if (body.action === 'lot_waste') {
+      const lotId = Number(body.lot_id), wasteQuantity = Number(body.quantity)
+      if (!Number.isInteger(lotId) || lotId < 1 || !Number.isFinite(wasteQuantity) || wasteQuantity <= 0) return O({ error: '廃棄数量を確認してください' }, 400)
+      const reason = String(body.reason || '期限・品質').trim().slice(0, 500)
+      const { data, error } = await sb.rpc('record_inventory_lot_waste', { p_store_id: storeId, p_lot_id: lotId, p_quantity: wasteQuantity, p_reason: reason, p_user_id: user.id })
+      if (error) return O({ error: error.message || '廃棄を記録できませんでした' }, 400)
+      await sb.from('audit_logs').insert({ store_id: storeId, user_id: user.id, action: 'inventory_lot_waste_recorded', entity_type: 'inventory_lot', entity_id: String(lotId), details: { quantity: wasteQuantity, reason, remaining_quantity: data?.remaining_quantity } })
+      return O({ ok: true, waste: data })
+    }
     if (['item_create','item_update','item_deactivate'].includes(String(body.action))) {
       if (!['owner','admin','manager'].includes(membership.role)) return O({ error: '品目設定は店長権限が必要です' }, 403)
       const groups = ['冷蔵庫仕込み在庫','タレ系在庫','冷凍食材在庫','メイン食材在庫','買い出し系食材','飲み物','備品','その他']
