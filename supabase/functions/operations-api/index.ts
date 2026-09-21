@@ -26,6 +26,22 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}))
+      if (body.action === 'task_done') {
+        const taskId = Number(body.task_id)
+        if (!Number.isInteger(taskId) || taskId < 1) return json({ error: 'タスクが正しくありません' }, 400)
+        const completedAt = new Date().toISOString()
+        const { data: task, error } = await sb.from('store_tasks')
+          .update({ status: 'completed', completed_at: completedAt, completed_by: user.id })
+          .eq('id', taskId)
+          .eq('store_id', storeId)
+          .neq('status', 'completed')
+          .select('id,title,status,completed_at')
+          .maybeSingle()
+        if (error) throw error
+        if (!task) return json({ error: 'タスクが見つからないか、すでに完了しています' }, 409)
+        await sb.from('audit_logs').insert({ store_id: storeId, user_id: user.id, action: 'store_task_completed', entity_type: 'store_task', entity_id: String(taskId), details: { title: task.title } })
+        return json({ ok: true, task })
+      }
       if (body.action !== 'handoff') return json({ error: '未対応の操作です' }, 400)
       const message = String(body.message || '').trim().slice(0, 500)
       if (!message) return json({ error: '引継ぎ内容を入力してください' }, 400)
@@ -37,12 +53,23 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, handoff })
     }
     if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+    if (parsed.searchParams.get('mode') === 'tasks') {
+      const businessDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date())
+      const { data: tasks, error } = await sb.from('store_tasks')
+        .select('id,title,category,due_at,priority,status,notes,completed_at')
+        .eq('store_id', storeId)
+        .eq('business_date', businessDate)
+        .order('priority', { ascending: true })
+        .order('due_at', { ascending: true, nullsFirst: false })
+      if (error) throw error
+      return json({ tasks: tasks || [], business_date: businessDate, role: membership.role })
+    }
     if (!managerRoles.has(membership.role)) return json({ error: '操作履歴は店長のみ確認できます' }, 403)
 
     const { data: logs, error } = await sb.from('audit_logs')
       .select('id,user_id,action,entity_type,entity_id,details,created_at')
       .eq('store_id', storeId)
-      .in('action', ['sale_status_changed', 'happy_hour_changed', 'ordering_changed', 'opening_check_completed', 'payment_completed', 'payment_reverted', 'daily_closing_completed', 'inventory_count_recorded', 'handoff_created'])
+      .in('action', ['sale_status_changed', 'happy_hour_changed', 'ordering_changed', 'opening_check_completed', 'payment_completed', 'payment_reverted', 'daily_closing_completed', 'inventory_count_recorded', 'handoff_created', 'store_task_completed'])
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) throw error
