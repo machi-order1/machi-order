@@ -4,7 +4,7 @@ const checks = [];
 const source = async (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
 const expect = (name, ok) => checks.push({ name, ok: Boolean(ok) });
 
-const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, operationsApi, worker, menu, kitchen, kitchenManifest, productAdmin, menuAdminApi, menuApi, kitchenApi, orderingGuard, timeClock, myShifts, workforceApi, uiConfig, closing, closingApi, inventory, inventoryApi, systemCheck, offline, inventoryImport, inventoryParser] = await Promise.all([
+const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, operationsApi, worker, menu, kitchen, kitchenManifest, productAdmin, menuAdminApi, menuApi, kitchenApi, orderingGuard, timeClock, myShifts, workforceApi, uiConfig, closing, closingApi, inventory, inventoryApi, systemCheck, offline, inventoryImport, inventoryParser, prep, prepMigration] = await Promise.all([
   source('cashier.html'),
   source('supabase/functions/cashier-api/index.ts'),
   source('supabase/migrations/20260921_cashier_payment_undo.sql'),
@@ -34,6 +34,8 @@ const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, op
   source('offline.html'),
   source('inventory-message-import.html'),
   source('inventory-text-parser.js'),
+  source('prep.html'),
+  source('supabase/migrations/20260921160000_inventory_prep_expiry.sql'),
 ]);
 
 expect('現金受取を明示してから会計完了', cashier.includes('現金を受け取りました'));
@@ -56,7 +58,7 @@ expect('営業前チェック完了を担当者付きで記録', opening.include
 expect('操作履歴は店長権限だけ閲覧可能', operationLog.includes('operations-api') && operationsApi.includes('managerRoles'));
 expect('商品・受付・会計の重要操作を監査記録', menuAdminApi.includes('sale_status_changed') && menuAdminApi.includes('ordering_changed') && cashierApi.includes('payment_completed') && cashierApi.includes('payment_reverted'));
 expect('売切・停止を1タップで絞込', productAdmin.includes('quickfilters') && productAdmin.includes('data-status="sold_out"'));
-expect('更新キャッシュ番号', worker.includes("machi-order-v71-22"));
+expect('更新キャッシュ番号', worker.includes("machi-order-v71-23"));
 expect('営業時間外・受付停止を注文前に表示', menu.includes('orderingMessage') && menu.includes('現在は注文できません'));
 expect('店長が注文受付を一時停止・再開できる', productAdmin.includes('set_ordering_enabled') && productAdmin.includes('注文受付を停止中'));
 expect('注文受付停止をAPI側でも返す', menuApi.includes('注文受付を一時停止しています'));
@@ -73,7 +75,7 @@ expect('勤怠APIは二重打刻と休憩中退勤を防止', workforceApi.inclu
 expect('シフト日付検証は数字を正しく受け付ける', workforceApi.includes('/^\\d{4}-\\d{2}-\\d{2}$/') && !workforceApi.includes('/^\\\\d{4}'));
 expect('マイシフトは手入力トークンを廃止', myShifts.includes('machi_access_token') && !myShifts.includes('ログイントークン'));
 expect('スタッフ画面から勤怠打刻へ移動', uiConfig.includes("link.href='/time-clock.html'"));
-expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-22") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
+expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-23") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
 expect('日次締めは保存済みログインを使用', closing.includes('machi_access_token') && !closing.includes('アクセストークン'));
 expect('閉店チェック完了前は締め不可', closing.includes('checksDone()') && closing.includes('data-close-check'));
 expect('現金差額ありは理由入力が必須', closingApi.includes('現金差額があるため') && closingApi.includes('!note'));
@@ -101,6 +103,11 @@ expect('両店舗で共通在庫マスターを使用', inventoryParser.includes
 expect('仕込み済みは先に使う表示', inventory.includes('先に使う・仕込み済み') && inventoryApi.includes("itemType === 'prepared'"));
 expect('店長が在庫品目を追加・変更・停止', inventoryApi.includes("item_create") && inventoryApi.includes("item_update") && inventoryApi.includes("item_deactivate"));
 expect('複合数量は誤計算せず原文保持', inventoryParser.includes("/[+×xX]/") && inventoryImport.includes('5P+6個'));
+expect('仕込み前後の在庫をDB内で一括振替', inventoryApi.includes("rpc('complete_inventory_prep'") && prepMigration.includes("'prep_input'") && prepMigration.includes("'prep_output'"));
+expect('仕込みロットに担当者と期限を記録', prepMigration.includes('prepared_at') && prepMigration.includes('prepared_by') && prepMigration.includes('expires_on'));
+expect('期限切れ・本日・明日を色分け', prep.includes('期限切れ') && prep.includes('本日まで') && prep.includes('明日まで'));
+expect('ロット残量以内で廃棄記録', inventoryApi.includes("action === 'lot_waste'") && prepMigration.includes('ロット残量を超えて廃棄できません'));
+expect('仕込み画面をオフラインキャッシュ', worker.includes("'/prep.html'"));
 
 for (const check of checks) console.log(`${check.ok ? 'PASS' : 'FAIL'}  ${check.name}`);
 if (checks.some((check) => !check.ok)) process.exitCode = 1;
