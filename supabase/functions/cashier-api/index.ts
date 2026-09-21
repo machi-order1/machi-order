@@ -53,6 +53,15 @@ Deno.serve(async (req: Request) => {
           if (message.includes('undo_window_expired')) return json({ error: '会計完了から5分を過ぎたため、店長確認が必要です' }, 409)
           throw error
         }
+        const { error: auditError } = await sb.from('audit_logs').insert({
+          store_id: storeId,
+          user_id: user.id,
+          action: 'payment_reverted',
+          entity_type: 'order',
+          entity_id: String(orderId),
+          details: { amount: data?.total, payment_method: data?.previous_payment_method, external_refund_required: Boolean(data?.external_refund_required) },
+        })
+        if (auditError) console.error('audit_log_failed', auditError)
         return json(data || { ok: true })
       }
       const method = String(body.payment_method || '')
@@ -62,6 +71,15 @@ Deno.serve(async (req: Request) => {
         if (String(error.message).includes('order_not_found')) return json({ error: '注文が見つかりません' }, 404)
         throw error
       }
+      const { error: auditError } = await sb.from('audit_logs').insert({
+        store_id: storeId,
+        user_id: user.id,
+        action: 'payment_completed',
+        entity_type: 'order',
+        entity_id: String(orderId),
+        details: { amount: data?.total, payment_method: method, receipt_number: data?.receipt_number },
+      })
+      if (auditError) console.error('audit_log_failed', auditError)
       return json(data || { ok: true })
     }
     return json({ error: 'Method not allowed' }, 405)

@@ -4,17 +4,20 @@ const checks = [];
 const source = async (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
 const expect = (name, ok) => checks.push({ name, ok: Boolean(ok) });
 
-const [cashier, cashierApi, paymentUndo, reset, login, opening, worker, menu, kitchen, productAdmin, menuApi, kitchenApi, orderingGuard] = await Promise.all([
+const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, operationsApi, worker, menu, kitchen, productAdmin, menuAdminApi, menuApi, kitchenApi, orderingGuard] = await Promise.all([
   source('cashier.html'),
   source('supabase/functions/cashier-api/index.ts'),
   source('supabase/migrations/20260921_cashier_payment_undo.sql'),
   source('reset-password.html'),
   source('login.html'),
   source('opening-check.html'),
+  source('operation-log.html'),
+  source('supabase/functions/operations-api/index.ts'),
   source('sw.js'),
   source('index.html'),
   source('kitchen.html'),
   source('product-admin.html'),
+  source('supabase/functions/menu-admin-api/index.ts'),
   source('supabase/functions/menu-api/index.ts'),
   source('supabase/functions/kitchen-api/index.ts'),
   source('supabase/migrations/20260921_ordering_pause_guard.sql'),
@@ -36,7 +39,11 @@ expect('営業前チェックで席QR14件を確認', opening.includes('active_t
 expect('営業前チェックで公開商品40件を確認', opening.includes('customer_visible_product_count===40'));
 expect('営業前チェックで厨房・会計APIを確認', opening.includes('k.ok&&c.ok'));
 expect('営業前チェックで注文受付ONを確認', opening.includes('注文受付スイッチ') && opening.includes('ordering_enabled!==false'));
-expect('更新キャッシュ番号', worker.includes("machi-order-v71-15"));
+expect('営業前チェック完了を担当者付きで記録', opening.includes('record_opening_check') && menuAdminApi.includes('opening_check_completed'));
+expect('操作履歴は店長権限だけ閲覧可能', operationLog.includes('operations-api') && operationsApi.includes('managerRoles'));
+expect('商品・受付・会計の重要操作を監査記録', menuAdminApi.includes('sale_status_changed') && menuAdminApi.includes('ordering_changed') && cashierApi.includes('payment_completed') && cashierApi.includes('payment_reverted'));
+expect('売切・停止を1タップで絞込', productAdmin.includes('quickfilters') && productAdmin.includes('data-status="sold_out"'));
+expect('更新キャッシュ番号', worker.includes("machi-order-v71-16"));
 expect('営業時間外・受付停止を注文前に表示', menu.includes('orderingMessage') && menu.includes('現在は注文できません'));
 expect('店長が注文受付を一時停止・再開できる', productAdmin.includes('set_ordering_enabled') && productAdmin.includes('注文受付を停止中'));
 expect('注文受付停止をAPI側でも返す', menuApi.includes('注文受付を一時停止しています'));

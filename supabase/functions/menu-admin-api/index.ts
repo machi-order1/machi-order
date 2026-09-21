@@ -33,6 +33,10 @@ Deno.serve(async (req: Request) => {
     if (!membership) return json({ error: 'この店舗を操作する権限がありません' }, 403)
     const { data: store, error: storeError } = await sb.from('stores').select('id,name,brand_id').eq('id', storeId).single()
     if (storeError || !store) return json({ error: '店舗が見つかりません' }, 404)
+    const writeAudit = async (action: string, entityType: string, entityId: string | null, details: Record<string, unknown> = {}) => {
+      const { error } = await sb.from('audit_logs').insert({ store_id: storeId, user_id: userData.user.id, action, entity_type: entityType, entity_id: entityId, details })
+      if (error) console.error('audit_log_failed', error)
+    }
 
     if (req.method === 'GET') {
       const { data: categories, error: categoryError } = await sb.from('categories').select('id,name,sort_order').eq('brand_id', store.brand_id).order('sort_order')
@@ -48,6 +52,15 @@ Deno.serve(async (req: Request) => {
       if (tableError) throw tableError
       const { data: settings, error: settingsError } = await sb.from('store_settings').select('ordering_enabled').eq('store_id', storeId).maybeSingle()
       if (settingsError) throw settingsError
+      const todayJst = new Date(Date.now() + 9 * 60 * 60_000).toISOString().slice(0, 10)
+      const startUtc = new Date(`${todayJst}T00:00:00+09:00`).toISOString()
+      const { data: openingCheck, error: openingError } = await sb.from('audit_logs').select('created_at,user_id,details').eq('store_id', storeId).eq('action', 'opening_check_completed').gte('created_at', startUtc).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (openingError) throw openingError
+      let openingStaffName: string | null = null
+      if (openingCheck?.user_id) {
+        const { data: profile } = await sb.from('staff_profiles').select('display_name').eq('user_id', openingCheck.user_id).maybeSingle()
+        openingStaffName = profile?.display_name || null
+      }
       const statusMap = new Map((statuses || []).map((s: any) => [Number(s.product_id), s]))
       return json({
         store: { id: store.id, name: store.name },
@@ -61,6 +74,7 @@ Deno.serve(async (req: Request) => {
           customer_visible_product_count: (products || []).filter((p: any) => p.customer_visible).length,
           unavailable_product_count: (products || []).filter((p: any) => (statusMap.get(Number(p.id))?.sale_status || 'available') !== 'available').length,
           active_price_rule_count: (rules || []).filter((r: any) => r.active).length,
+          opening_check: openingCheck ? { completed_at: openingCheck.created_at, staff_name: openingStaffName || 'スタッフ', details: openingCheck.details } : null,
         },
         categories: categories || [],
         products: (products || []).map((p: any) => ({ ...p, sale_status: statusMap.get(Number(p.id))?.sale_status || 'available' })),
@@ -74,8 +88,10 @@ Deno.serve(async (req: Request) => {
       if (!Number.isInteger(productId) || !allowedStatuses.has(saleStatus)) return json({ error: '販売状態が正しくありません' }, 400)
       const { data: product } = await sb.from('products').select('id').eq('id', productId).eq('brand_id', store.brand_id).eq('active', true).maybeSingle()
       if (!product) return json({ error: '商品が見つかりません' }, 404)
+      const { data: current } = await sb.from('store_products').select('sale_status').eq('store_id', storeId).eq('product_id', productId).maybeSingle()
       const { error } = await sb.from('store_products').upsert({ store_id: storeId, product_id: productId, sale_status: saleStatus, updated_at: new Date().toISOString() })
       if (error) throw error
+      await writeAudit('sale_status_changed', 'product', String(productId), { from: current?.sale_status || 'available', to: saleStatus })
       return json({ ok: true, product_id: productId, sale_status: saleStatus })
     }
 
@@ -96,6 +112,7 @@ Deno.serve(async (req: Request) => {
         const { error } = await sb.from('price_rules').update({ price, start_time: startTime, end_time: endTime, active }).eq('store_id', storeId).eq('id', id)
         if (error) throw error
       }
+      await writeAudit('happy_hour_changed', 'price_rule', null, { active, start_time: startTime, end_time: endTime, prices })
       return json({ ok: true, start_time: startTime, end_time: endTime, active })
     }
     if (action === 'set_ordering_enabled') {
@@ -103,7 +120,18 @@ Deno.serve(async (req: Request) => {
       if (typeof body.enabled !== 'boolean') return json({ error: '注文受付の状態が正しくありません' }, 400)
       const { error } = await sb.from('store_settings').upsert({ store_id: storeId, ordering_enabled: body.enabled, updated_at: new Date().toISOString() }, { onConflict: 'store_id' })
       if (error) throw error
+      await writeAudit('ordering_changed', 'store', String(storeId), { enabled: body.enabled })
       return json({ ok: true, ordering_enabled: body.enabled })
+    }
+    if (action === 'record_opening_check') {
+      const score = Number(body.score), total = Number(body.total)
+      if (!Number.isInteger(score) || !Number.isInteger(total) || total < 1 || total > 20 || score !== total) return json({ error: '営業前チェックが完了していません' }, 400)
+      const todayJst = new Date(Date.now() + 9 * 60 * 60_000).toISOString().slice(0, 10)
+      const startUtc = new Date(`${todayJst}T00:00:00+09:00`).toISOString()
+      const { data: existing } = await sb.from('audit_logs').select('id,created_at').eq('store_id', storeId).eq('action', 'opening_check_completed').gte('created_at', startUtc).limit(1).maybeSingle()
+      if (existing) return json({ ok: true, already_recorded: true, completed_at: existing.created_at })
+      await writeAudit('opening_check_completed', 'store', String(storeId), { score, total, checked_at: new Date().toISOString() })
+      return json({ ok: true, completed_at: new Date().toISOString() })
     }
     return json({ error: '操作が正しくありません' }, 400)
   } catch (error) {
