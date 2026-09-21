@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#e51b23">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/machi-design-system.css">
+  <title>勤怠打刻｜MACHI ORDER</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f7f3ee;color:#171717;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}main{max-width:680px;margin:auto;padding:24px 16px 96px}.ey{font-size:11px;letter-spacing:.16em;font-weight:950;color:#8a8179}h1{font-size:31px;margin:7px 0 18px}.status{padding:22px;margin-bottom:12px;border-top:6px solid #e51b23}.status.off{border-color:#aaa}.label{font-size:12px;font-weight:900;color:#777}.state{font-size:27px;font-weight:950;margin:5px 0}.clock{font-variant-numeric:tabular-nums;font-size:16px;color:#666}.shift{margin-top:15px;padding-top:14px;border-top:1px solid #eee;line-height:1.7}.actions{display:grid;gap:10px}.action{min-height:62px;border:0;border-radius:17px;color:#fff;background:#171717;font-size:18px;font-weight:950}.action.red{background:#e51b23}.action.outline{background:#fff;color:#171717;border:2px solid #171717}.action:disabled{opacity:.45}.message{min-height:26px;margin:13px 2px;color:#b71920;font-weight:800;line-height:1.5}.message.ok{color:#16733b}.today{padding:18px;margin-top:14px}.today h2{font-size:18px;margin:0 0 10px}.row{padding:11px 0;border-top:1px solid #eee}.row:first-of-type{border-top:0}.links{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.links a{text-align:center;padding:14px 8px;border-radius:14px;background:#fff;border:1px solid #ddd;color:#171717;text-decoration:none;font-weight:850}.back{display:inline-block;margin-bottom:14px;color:#555;text-decoration:none;font-weight:800}
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="/staff.html">← マイページ</a>
+    <div class="ey">MACHI ORDER · ATTENDANCE</div><h1>勤怠打刻</h1>
+    <section class="mo-card status off" id="status-card"><div class="label">現在の状態</div><div class="state" id="state">確認しています…</div><div class="clock" id="clock"></div><div class="shift" id="current"></div></section>
+    <div class="actions"><button class="action red" id="clock-in" hidden>出勤する</button><button class="action outline" id="break-start" hidden>休憩を開始</button><button class="action red" id="break-end" hidden>休憩を終了</button><button class="action" id="clock-out" hidden>退勤する</button></div>
+    <div class="message" id="message" role="alert"></div>
+    <section class="mo-card today"><h2>今日の予定</h2><div id="schedule">確認しています…</div></section>
+    <div class="links"><a href="/my-shifts.html">今後のシフト</a><a href="/shift-request.html">希望を提出</a></div>
+  </main>
+  <script>
+    const API='https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/workforce-api?store_id=1';
+    const token=()=>localStorage.machi_access_token||localStorage.mo_staff_token||'';
+    const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo'}).format(new Date());
+    const fmt=t=>t?new Date(t).toLocaleTimeString('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}):'—';
+    let snapshot=null,busy=false;
+    function requireLogin(){if(token())return true;location.replace('/login.html?next='+encodeURIComponent('/time-clock.html'));return false}
+    function failAuth(){localStorage.removeItem('machi_access_token');localStorage.removeItem('mo_staff_token');location.replace('/login.html?next='+encodeURIComponent('/time-clock.html'))}
+    function tick(){const now=new Date();document.getElementById('clock').textContent=now.toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'long',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+    function render(){
+      if(!snapshot)return;const {current={},shifts=[]}=snapshot,on=current.working,br=current.on_break,s=current.shift;
+      document.getElementById('status-card').classList.toggle('off',!on);document.getElementById('state').textContent=!on?'未出勤':br?'休憩中':'勤務中';
+      document.getElementById('current').innerHTML=on?`出勤 <b>${fmt(s.clock_in)}</b>${s.break_minutes?`<br>終了済み休憩 ${s.break_minutes}分`:''}`:'出勤すると勤務時間の計測を開始します。';
+      document.getElementById('clock-in').hidden=on;document.getElementById('break-start').hidden=!on||br;document.getElementById('break-end').hidden=!on||!br;document.getElementById('clock-out').hidden=!on||br;
+      const rows=shifts.filter(x=>x.shift_date===today()&&x.status!=='cancelled');document.getElementById('schedule').innerHTML=rows.length?rows.map(x=>`<div class="row"><b>${String(x.scheduled_start||'').slice(0,5)}〜${String(x.scheduled_end||'').slice(0,5)}</b>　${x.status==='completed'?'勤務完了':x.status==='working'?'勤務中':'勤務予定'}</div>`).join(''):'本日の登録シフトはありません。予定外出勤として打刻できます。';tick();
+    }
+    async function load(){if(!requireLogin())return;const d=today();try{const r=await fetch(API+'&from='+d+'&to='+d,{headers:{Authorization:'Bearer '+token()}}),j=await r.json().catch(()=>({}));if(r.status===401)return failAuth();if(!r.ok)throw Error(j.error||'勤怠を確認できませんでした');snapshot=j;render();document.getElementById('message').textContent=''}catch(e){document.getElementById('state').textContent='確認できません';document.getElementById('message').textContent=e.message}}
+    async function act(action){if(busy)return;busy=true;document.querySelectorAll('button').forEach(b=>b.disabled=true);const m=document.getElementById('message');m.className='message';m.textContent='処理しています…';try{const r=await fetch(API,{method:'POST',headers:{Authorization:'Bearer '+token(),'Content-Type':'application/json'},body:JSON.stringify({action})}),j=await r.json().catch(()=>({}));if(r.status===401)return failAuth();if(!r.ok)throw Error(j.error||'処理できませんでした');m.className='message ok';m.textContent={clock_in:'出勤を記録しました',break_start:'休憩開始を記録しました',break_end:'休憩終了を記録しました',clock_out:'退勤を記録しました'}[action];await load()}catch(e){m.textContent=e.message}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false)}}
+    document.getElementById('clock-in').onclick=()=>act('clock_in');document.getElementById('break-start').onclick=()=>act('break_start');document.getElementById('break-end').onclick=()=>act('break_end');document.getElementById('clock-out').onclick=()=>{if(confirm('退勤を記録しますか？'))act('clock_out')};
+    setInterval(tick,1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});load();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  </script>
+</body>
+</html>

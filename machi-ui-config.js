@@ -37,3 +37,13 @@ document.addEventListener('DOMContentLoaded',()=>{
  };
  if(app)new MutationObserver(enhance).observe(app,{childList:true,subtree:true});enhance();
 });
+
+document.addEventListener('DOMContentLoaded',()=>{
+ if(location.pathname!=='/staff.html'&&location.pathname!=='/staff')return;
+ const grid=document.querySelector('.grid'),shift=grid?.querySelector('a[href="/my-shifts.html"]');
+ if(!grid||!shift||grid.querySelector('a[href="/time-clock.html"]'))return;
+ const link=document.createElement('a');
+ link.className='mo-card tile';link.href='/time-clock.html';
+ link.innerHTML='<i>⏱</i><b>勤怠打刻</b><small>出勤・休憩・退勤</small>';
+ grid.insertBefore(link,shift);
+});
