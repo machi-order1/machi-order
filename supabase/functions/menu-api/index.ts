@@ -72,6 +72,7 @@ Deno.serve(async (req: Request) => {
       return out({
         brand: store.brands?.name,
         store: store.name,
+        table_id: table.id,
         table: table.name,
         ordering: {
           enabled: orderingEnabled,

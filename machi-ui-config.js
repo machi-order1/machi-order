@@ -1,12 +1,14 @@
 
 (function(){
  const isKitchen=location.pathname==='/kitchen.html'||location.pathname==='/kitchen';
+ const isCashier=location.pathname==='/cashier.html'||location.pathname==='/cashier';
  const storeKey=isKitchen?new URLSearchParams(location.search).get('store'):null;
- if(storeKey==='shirakibaru'){
+ const storeId=storeKey==='shirakibaru'?2:Number(new URLSearchParams(location.search).get('store_id')||1);
+ if(storeId===2&&(isKitchen||isCashier)){
   const nativeFetch=window.fetch.bind(window);
   window.fetch=(input,init)=>{
    const raw=typeof input==='string'?input:input?.url||'';
-   if(raw.includes('/functions/v1/kitchen-api?store_id=1')){
+   if(raw.includes('/functions/v1/kitchen-api?store_id=1')||raw.includes('/functions/v1/cashier-api?store_id=1')){
     const changed=raw.replace('store_id=1','store_id=2');
     input=typeof input==='string'?changed:new Request(changed,input);
    }
@@ -14,13 +16,14 @@
   };
   const manifest=document.querySelector('link[rel="manifest"]');
   if(manifest)manifest.href='/kitchen-shirakibaru.webmanifest';
-  document.title='白木原店 厨房｜MACHI ORDER';
+  document.title=isKitchen?'白木原店 厨房｜MACHI ORDER':'白木原店 会計｜MACHI ORDER';
   document.addEventListener('DOMContentLoaded',()=>{
-   const heading=document.querySelector('.head h1');if(heading)heading.textContent='白木原店 厨房';
+   const heading=document.querySelector('.head h1');if(heading)heading.textContent=isKitchen?'白木原店 厨房':'白木原店 会計';
    const brand=document.querySelector('.brand');if(brand)brand.textContent='MACHI ORDER · 白木原店';
    document.querySelectorAll('a[href="/kitchen.html"]').forEach(link=>link.href='/kitchen.html?store=shirakibaru');
+   document.querySelectorAll('a[href="/cashier.html"]').forEach(link=>link.href='/cashier.html?store_id=2');
    const app=document.getElementById('app');
-   if(app)new MutationObserver(()=>document.querySelectorAll('a[href="/login.html?next=/kitchen.html"]').forEach(link=>link.href='/login.html?next='+encodeURIComponent('/kitchen.html?store=shirakibaru'))).observe(app,{childList:true,subtree:true});
+   if(app)new MutationObserver(()=>document.querySelectorAll('a[href^="/login.html?next="]').forEach(link=>link.href='/login.html?next='+encodeURIComponent(isKitchen?'/kitchen.html?store=shirakibaru':'/cashier.html?store_id=2'))).observe(app,{childList:true,subtree:true});
   });
  }
  const defaults={brandName:"MACHI ORDER",storeName:"長浜店",accent:"#171717",radius:"20px",density:"comfortable"};
@@ -43,10 +46,24 @@ document.addEventListener('DOMContentLoaded',()=>{
  open.className='tile';open.href='/opening-check.html';
  open.innerHTML='<div class="ico">✅</div><b>営業前チェック</b><span>QR・厨房・会計・通知音</span>';
  grid.insertBefore(open,inventory);
+ const oral=document.createElement('a');
+ oral.className='tile';oral.href='/staff-order.html?store_id=1';
+ oral.innerHTML='<div class="ico">＋</div><b>口頭注文</b><span>席を選んで代理入力</span>';
+ grid.insertBefore(oral,inventory);
  const system=document.createElement('a');
  system.className='tile';system.href='/system-check.html';
  system.innerHTML='<div class="ico">🛟</div><b>システム確認</b><span>通信・ログイン・復旧</span>';
  grid.appendChild(system);
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+ const isKitchen=location.pathname==='/kitchen.html'||location.pathname==='/kitchen';
+ if(!isKitchen)return;
+ const white=new URLSearchParams(location.search).get('store')==='shirakibaru',head=document.querySelector('.headside');
+ if(!head||head.querySelector('.oral-order-link'))return;
+ const link=document.createElement('a');link.className='device-test oral-order-link';
+ link.style.textDecoration='none';link.href='/staff-order.html?store_id='+(white?'2':'1');link.textContent='＋ 口頭注文';
+ head.insertBefore(link,head.firstChild);
 });
 
 document.addEventListener('DOMContentLoaded',()=>{

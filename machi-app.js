@@ -21,11 +21,12 @@
     const saved = global.localStorage?.getItem('machi_store_id');
     const id = toPositiveInt(params.get('store_id'), toPositiveInt(saved, DEFAULT_STORE.id));
     if (global.localStorage) global.localStorage.setItem('machi_store_id', String(id));
-    return Object.freeze({
-      id,
-      code: id === 1 ? DEFAULT_STORE.code : `store-${id}`,
-      name: id === 1 ? DEFAULT_STORE.name : `店舗 ${id}`
-    });
+    const known = id === 1
+      ? DEFAULT_STORE
+      : id === 2
+        ? { id: 2, code: 'shirakibaru', name: '白木原店' }
+        : { id, code: `store-${id}`, name: `店舗 ${id}` };
+    return Object.freeze(known);
   }
 
   function getToken() {

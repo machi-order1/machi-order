@@ -29,7 +29,8 @@
     const SUPABASE='https://tejglrlkaqolbghoagqj.supabase.co';
     const KEY='sb_publishable_beZla85Y6Ngrx0hji9I9rg_FbcRSUoT';
     const next=(()=>{const v=new URLSearchParams(location.search).get('next')||'/kitchen.html';return v.startsWith('/')&&!v.startsWith('//')?v:'/kitchen.html'})();
-    const isShirakibaru=next.startsWith('/kitchen-shirakibaru.html');
+    const nextUrl=new URL(next,location.origin);
+    const isShirakibaru=next.startsWith('/kitchen-shirakibaru.html')||nextUrl.searchParams.get('store_id')==='2'||nextUrl.searchParams.get('store')==='shirakibaru';
     document.getElementById('login-lead').textContent=(isShirakibaru?'白木原店':'長浜店')+'のスタッフ画面を開きます。';
     function saveSession(j){
       localStorage.setItem('machi_access_token',j.access_token);

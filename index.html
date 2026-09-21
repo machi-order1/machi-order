@@ -233,7 +233,10 @@
       const requestId = Machi.createId('customer');
       localStorage.setItem(pendingKey, JSON.stringify({ request_id: requestId, created_at: new Date().toISOString(), items: cart }));
       try {
-        const result = await Machi.api('menu-api', { method: 'POST', token: '', body: { token: seatToken, request_id: requestId, channel: orderChannel, items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, option_ids: item.option_ids })) } });
+        const payload = { token: seatToken, table_id: data.table_id, request_id: requestId, items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, option_ids: item.option_ids })) };
+        const result = orderChannel === 'staff'
+          ? await Machi.api('staff-order-api', { method: 'POST', body: payload })
+          : await Machi.api('menu-api', { method: 'POST', token: '', body: payload });
         localStorage.removeItem(pendingKey);
         cart = [];
         saveCart();
