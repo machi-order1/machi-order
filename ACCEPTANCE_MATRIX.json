@@ -16,16 +16,16 @@
     "blocker": "authenticated E2E on store device"
   },
   "attendance": {
-    "status": "ui_ready",
-    "blocker": "scheduled/actual shift matching"
+    "status": "api_ready",
+    "blocker": "authenticated E2E on store device"
   },
   "inventory": {
     "status": "ui_ready",
     "blocker": "write-flow E2E"
   },
   "hygiene": {
-    "status": "read_ui_ready",
-    "blocker": "operations-api RLS/JWT"
+    "status": "api_ready",
+    "blocker": "authenticated E2E on store device"
   },
   "closing": {
     "status": "safe_draft_ready",
