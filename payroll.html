@@ -194,7 +194,7 @@
         </button>
       </section>
       <section class="summary">
-        <div class="stat"><small>給与実績</small><b id="actualPay">—</b></div>
+        <div class="stat"><small>基本給概算</small><b id="actualPay">—</b></div>
         <div class="stat">
           <small>予定人件費</small><b id="scheduledPay">—</b>
         </div>
@@ -203,7 +203,11 @@
           <small>予定時間</small><b id="scheduledHours">—</b>
         </div>
       </section>
+      <p class="muted">
+        金額は登録時給・固定給による概算です。割増・控除などを含む最終給与ではありません。
+      </p>
       <div id="msg" class="msg"></div>
+      <div id="attendanceAlerts" class="panel" role="status" hidden></div>
       <div id="list"></div>
     </main>
     <div class="modal" id="shiftModal">
@@ -240,6 +244,14 @@
       <div class="modalbox">
         <h2>勤怠を確定</h2>
         <input type="hidden" id="attendanceId" />
+        <div class="field">
+          <label for="reason">入力・修正の理由</label
+          ><input
+            id="reason"
+            maxlength="300"
+            placeholder="退勤の打刻忘れなど"
+          />
+        </div>
         <div class="field">
           <label>出勤</label><input id="clockIn" type="datetime-local" />
         </div>
@@ -286,7 +298,9 @@
           location.replace("/login.html?next=/payroll.html");
           return;
         }
-        $("#month").value = new Date().toISOString().slice(0, 7);
+        $("#month").value = new Date(Date.now() + 9 * 3600000)
+          .toISOString()
+          .slice(0, 7);
         async function api(method = "GET", body) {
           let url = API;
           if (method === "GET")
@@ -314,6 +328,7 @@
         function dt(v) {
           return v
             ? new Date(v).toLocaleString("ja-JP", {
+                timeZone: "Asia/Tokyo",
                 month: "numeric",
                 day: "numeric",
                 hour: "2-digit",
@@ -322,22 +337,81 @@
             : "未入力";
         }
         function localInput(v) {
-          if (!v) return "";
-          let d = new Date(v),
-            z = (n) => String(n).padStart(2, "0");
-          return (
-            d.getFullYear() +
-            "-" +
-            z(d.getMonth() + 1) +
-            "-" +
-            z(d.getDate()) +
-            "T" +
-            z(d.getHours()) +
-            ":" +
-            z(d.getMinutes())
+          return v
+            ? new Date(new Date(v).getTime() + 9 * 3600000)
+                .toISOString()
+                .slice(0, 16)
+            : "";
+        }
+        function findShift(id) {
+          return data.staff
+            .flatMap((p) => p.shifts || [])
+            .find((x) => x.id === id);
+        }
+        function editShift(id) {
+          const x = findShift(id);
+          if (!x) return;
+          openShift();
+          $("#shiftId").value = x.id;
+          $("#staff").value =
+            x.roster_staff_id ||
+            data.staff.find((p) => p.shifts.some((s) => s.id === id))?.id;
+          $("#shiftStore").value = x.store_id;
+          $("#staff").disabled = true;
+          $("#shiftStore").disabled = true;
+          $("#date").value = x.shift_date;
+          $("#start").value = x.scheduled_start?.slice(0, 5) || "";
+          $("#end").value = x.scheduled_end?.slice(0, 5) || "";
+        }
+        async function cancelShift(id) {
+          const x = findShift(id);
+          if (!x) return;
+          const reason = prompt(
+            "この勤務予定を取り消す理由を入力してください（2〜300文字）",
           );
+          if (reason === null) return;
+          try {
+            await api("POST", {
+              action: "shift_cancel",
+              shift_id: id,
+              expected_updated_at: x.updated_at,
+              reason,
+            });
+            await load();
+          } catch (e) {
+            $("#msg").textContent = e.message;
+          }
         }
         function render() {
+          const today = new Date(Date.now() + 9 * 3600000)
+            .toISOString()
+            .slice(0, 10);
+          const unfinished = data.staff.flatMap((p) =>
+            (p.shifts || [])
+              .filter((x) => x.shift_date < today && x.status !== "completed")
+              .map((x) => ({
+                name: p.display_name,
+                date: x.shift_date,
+                working: !!x.clock_in,
+              })),
+          );
+          $("#attendanceAlerts").hidden = !unfinished.length;
+          $("#attendanceAlerts").innerHTML =
+            "<b>過去の勤怠を確認：" +
+            unfinished.length +
+            "件</b>" +
+            unfinished
+              .map(
+                (x) =>
+                  "<p>" +
+                  esc(x.date) +
+                  " " +
+                  esc(x.name) +
+                  "：" +
+                  (x.working ? "退勤が未入力" : "実績が未入力") +
+                  "</p>",
+              )
+              .join("");
           let s = data.summary || {};
           $("#actualPay").textContent = yen(s.actual_pay);
           $("#scheduledPay").textContent = yen(s.scheduled_pay);
@@ -347,7 +421,7 @@
             (data.staff || [])
               .map(
                 (p) =>
-                  `<article class="card"><div class="row"><div><div class="name">${esc(p.display_name)}</div><span class="badge">${p.employment_type === "fixed_salary" ? "固定給" : "時給 " + yen(p.hourly_wage)}</span></div><div style="text-align:right"><div class="pay">${yen(p.actual_pay)}</div><div class="muted">予定 ${yen(p.scheduled_pay)}</div></div></div><div class="muted" style="margin-top:8px">実働 ${hours(p.actual_minutes)} ／ 予定 ${hours(p.scheduled_minutes)}</div>${(p.shifts || []).map((x) => `<div class="shift"><div class="row"><b>${x.shift_date}　${String(x.scheduled_start || "").slice(0, 5)}〜${String(x.scheduled_end || "").slice(0, 5)}</b><span>${esc(data.stores.find((s) => s.id === x.store_id)?.name || "")}</span></div><div class="muted">${x.status === "completed" ? "確定 " + dt(x.clock_in) + "〜" + dt(x.clock_out) : "勤怠未確定"}</div><button class="btn" data-att="${x.id}" style="margin-top:7px">${x.status === "completed" ? "勤怠を修正" : "出退勤を入力"}</button></div>`).join("")}</article>`,
+                  `<article class="card"><div class="row"><div><div class="name">${esc(p.display_name)}</div><span class="badge">${p.employment_type === "fixed_salary" ? "固定給" : "時給 " + yen(p.hourly_wage)}</span></div><div style="text-align:right"><div class="pay">${yen(p.actual_pay)}</div><div class="muted">予定 ${yen(p.scheduled_pay)}</div></div></div><div class="muted" style="margin-top:8px">実働 ${hours(p.actual_minutes)} ／ 予定 ${hours(p.scheduled_minutes)}</div>${(p.shifts || []).map((x) => `<div class="shift"><div class="row"><b>${x.shift_date}　${String(x.scheduled_start || "").slice(0, 5)}〜${String(x.scheduled_end || "").slice(0, 5)}</b><span>${esc(data.stores.find((s) => s.id === x.store_id)?.name || "")}</span></div><div class="muted">${x.status === "completed" ? "確定 " + dt(x.clock_in) + "〜" + dt(x.clock_out) : "勤怠未確定"}</div><button class="btn" data-att="${x.id}" style="margin-top:7px">${x.status === "completed" ? "勤怠を修正" : "出退勤を入力"}</button>${x.status === "scheduled" && !x.clock_in ? ` <button class="btn" data-edit="${x.id}">予定を変更</button> <button class="btn" data-cancel="${x.id}">取消</button>` : ""}</div>`).join("")}</article>`,
               )
               .join("") ||
             '<div class="panel muted">対象スタッフがいません</div>';
@@ -384,18 +458,26 @@
           }
         }
         function openShift() {
+          $("#staff").disabled = false;
+          $("#shiftStore").disabled = false;
           if (!data.staff.length) return;
           $("#shiftId").value = "";
-          $("#date").value = new Date().toISOString().slice(0, 10);
+          $("#date").value = new Date(Date.now() + 9 * 3600000)
+            .toISOString()
+            .slice(0, 10);
           $("#start").value = "11:00";
           $("#end").value = "15:00";
           $("#shiftMsg").textContent = "";
           $("#shiftModal").classList.add("open");
         }
         async function saveShift() {
+          $("#saveShift").disabled = true;
           try {
             await api("POST", {
-              action: "shift_create",
+              action: $("#shiftId").value ? "shift_update" : "shift_create",
+              shift_id: Number($("#shiftId").value) || undefined,
+              expected_updated_at: findShift(Number($("#shiftId").value))
+                ?.updated_at,
               staff_id: Number($("#staff").value),
               store_id: Number($("#shiftStore").value),
               shift_date: $("#date").value,
@@ -406,6 +488,8 @@
             await load();
           } catch (e) {
             $("#shiftMsg").textContent = e.message;
+          } finally {
+            $("#saveShift").disabled = false;
           }
         }
         function openAttendance(id) {
@@ -414,6 +498,7 @@
             .find((x) => x.id === id);
           if (!x) return;
           $("#attendanceId").value = id;
+          $("#reason").value = "";
           $("#clockIn").value =
             localInput(x.clock_in) ||
             x.shift_date + "T" + String(x.scheduled_start).slice(0, 5);
@@ -425,20 +510,34 @@
           $("#attendanceModal").classList.add("open");
         }
         async function saveAttendance() {
+          $("#saveAttendance").disabled = true;
           try {
             await api("POST", {
               action: "attendance_save",
               shift_id: Number($("#attendanceId").value),
-              clock_in: new Date($("#clockIn").value).toISOString(),
-              clock_out: new Date($("#clockOut").value).toISOString(),
+              expected_updated_at: findShift(Number($("#attendanceId").value))
+                ?.updated_at,
+              reason: $("#reason").value,
+              clock_in: new Date($("#clockIn").value + "+09:00").toISOString(),
+              clock_out: new Date(
+                $("#clockOut").value + "+09:00",
+              ).toISOString(),
               break_minutes: Number($("#breakMinutes").value),
             });
             $("#attendanceModal").classList.remove("open");
             await load();
           } catch (e) {
             $("#attendanceMsg").textContent = e.message;
+          } finally {
+            $("#saveAttendance").disabled = false;
           }
         }
+        $("#list").addEventListener("click", (e) => {
+          const edit = e.target.closest("[data-edit]"),
+            cancel = e.target.closest("[data-cancel]");
+          if (edit) editShift(Number(edit.dataset.edit));
+          if (cancel) cancelShift(Number(cancel.dataset.cancel));
+        });
         $("#newShift").onclick = openShift;
         $("#saveShift").onclick = saveShift;
         $("#saveAttendance").onclick = saveAttendance;
