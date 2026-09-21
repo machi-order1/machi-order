@@ -1,5 +1,503 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><title>スタッフ名簿｜MACHI ORDER</title><link rel="stylesheet" href="/machi-design-system.css"><script src="/machi-ui-config.js"></script><style>
-*{box-sizing:border-box}body{margin:0;background:#f5f2ed;color:#171717;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}.top{background:#d92d2d;color:#fff;padding:22px 18px}.top a{color:#fff;text-decoration:none}.top h1{margin:12px 0 2px;font-size:30px}.wrap{max-width:820px;margin:auto;padding:15px 14px 100px}.toolbar,.card,.modalbox{background:#fff;border-radius:20px;padding:16px;margin:11px 0;border:1px solid #e4ded7}.filters{display:flex;gap:7px;overflow:auto;margin-top:12px}.filters button{border:0;border-radius:999px;padding:10px 15px;white-space:nowrap;font-weight:800}.filters button.on{background:#171717;color:#fff}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{background:#fff;border-radius:16px;padding:14px}.stat small{display:block;color:#777;font-weight:700}.stat b{font-size:25px}.staff{display:grid;grid-template-columns:1fr auto;gap:10px}.name{font-size:21px;font-weight:900}.chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.chip{font-size:12px;background:#f1eee9;border-radius:999px;padding:5px 9px;font-weight:700}.pay{font-weight:800;color:#555}.muted{color:#777;font-size:13px}.btn{border:0;border-radius:13px;padding:12px 15px;font-weight:900}.primary{background:#171717;color:#fff}.red{background:#d92d2d;color:#fff}.edit{align-self:start}.add{width:100%;font-size:17px}.modal{position:fixed;inset:0;background:#0008;display:none;z-index:20;padding:18px;overflow:auto}.modal.open{display:block}.modalbox{max-width:580px;margin:30px auto}.field{margin:13px 0}.field label{display:block;font-weight:800;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;padding:13px;border:1px solid #ccc;border-radius:12px;font-size:16px}.stores label{display:flex;gap:9px;align-items:center;padding:10px;background:#f5f2ed;border-radius:11px;margin:7px 0}.stores input{width:20px;height:20px}.actions{display:flex;gap:8px}.actions button{flex:1}.inactive{opacity:.55}.msg{min-height:22px;color:#b42318;font-weight:700}@media(max-width:520px){.summary{grid-template-columns:1fr 1fr}.summary .stat:last-child{grid-column:1/-1}}</style></head><body>
-<header class="top"><a href="/manager.html">← 店長ホーム</a><h1>スタッフ名簿</h1><div>長浜店・白木原店／給与・所属を一元管理</div></header><main class="wrap"><section class="toolbar"><a class="btn primary add" href="/payroll.html" style="display:block;text-align:center;text-decoration:none;margin-bottom:8px">📅 シフト・勤怠・給与を見る</a><button class="btn red add" id="add">＋ 新しいスタッフを追加</button><div class="filters" id="filters"></div></section><section class="summary"><div class="stat"><small>在籍</small><b id="active">—</b></div><div class="stat"><small>アルバイト</small><b id="part">—</b></div><div class="stat"><small>固定給</small><b id="fixed">—</b></div></section><div id="msg" class="msg"></div><section id="list"></section></main>
-<div class="modal" id="modal"><div class="modalbox"><h2 id="title">スタッフ追加</h2><input type="hidden" id="staffId"><div class="field"><label>氏名</label><input id="name" maxlength="80"></div><div class="field"><label>給与区分</label><select id="type"><option value="part_time">アルバイト（時給）</option><option value="fixed_salary">固定給（月給）</option></select></div><div class="field" id="wageBox"><label>時給</label><input id="wage" type="number" min="0" value="1100"></div><div class="field" id="salaryBox" hidden><label>月給</label><input id="salary" type="number" min="0" value="200000"></div><div class="field"><label>勤務店舗・役割</label><div class="stores" id="stores"></div></div><div class="field"><label>国籍・補足（任意）</label><input id="nationality" maxlength="80"></div><div class="field"><label>メモ（任意）</label><textarea id="note" maxlength="500"></textarea></div><div class="msg" id="formMsg"></div><div class="actions"><button class="btn" id="cancel">閉じる</button><button class="btn primary" id="save">保存</button></div><button class="btn" id="deactivate" style="width:100%;margin-top:10px;color:#b42318" hidden>退職・名簿から外す</button></div></div>
-<script>(()=>{const API='https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/staff-admin-api',$=s=>document.querySelector(s),token=()=>localStorage.machi_access_token||localStorage.mo_staff_token||'';let data={stores:[],staff:[]},filter='all';if(!token()){location.replace('/login.html?next=/staff-management.html');return}const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),yen=n=>'¥'+Number(n||0).toLocaleString();async function call(method='GET',body){const r=await fetch(API,{method,headers:{Authorization:'Bearer '+token(),'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}),j=await r.json().catch(()=>({}));if(r.status===401){location.replace('/login.html?next=/staff-management.html');return}if(!r.ok)throw Error(j.error||'処理できません');return j}function render(){const active=data.staff.filter(x=>x.active);$('#active').textContent=active.length+'名';$('#part').textContent=active.filter(x=>x.employment_type==='part_time').length+'名';$('#fixed').textContent=active.filter(x=>x.employment_type==='fixed_salary').length+'名';$('#filters').innerHTML=['all','inactive',...data.stores.map(x=>String(x.id))].map(v=>`<button data-f="${v}" class="${filter===v?'on':''}">${v==='all'?'全員':v==='inactive'?'退職者':esc(data.stores.find(x=>String(x.id)===v)?.name)}</button>`).join('');document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{filter=b.dataset.f;render()});let rows=data.staff.filter(x=>filter==='all'?x.active:filter==='inactive'?!x.active:x.active&&x.staff_store_assignments.some(a=>a.active&&String(a.store_id)===filter));$('#list').innerHTML=rows.map(x=>{const as=x.staff_store_assignments.filter(a=>a.active),stores=as.map(a=>{let s=data.stores.find(z=>z.id===a.store_id),role=a.role==='manager'?'・店長':a.role==='owner'?'・オーナー':'';return `<span class="chip">${esc(s?.name||'店舗')}${role}</span>`}).join(''),pay=x.employment_type==='fixed_salary'?`固定給 ${yen(x.monthly_salary)}／月`:`時給 ${yen(x.hourly_wage)}`;return `<article class="card staff ${x.active?'':'inactive'}"><div><div class="name">${esc(x.display_name)}</div><div class="chips">${stores||'<span class="chip">所属なし</span>'}${x.nationality?`<span class="chip">${esc(x.nationality)}</span>`:''}</div><div class="pay">${pay}</div><div class="muted">${x.auth_user_id?'ログイン連携済み':'ログイン未連携'}${x.active?'':'・退職済み'}</div></div><button class="btn edit" data-id="${x.id}">${x.active?'編集':'確認'}</button></article>`}).join('')||'<div class="card muted">該当するスタッフはいません</div>';document.querySelectorAll('.edit').forEach(b=>b.onclick=()=>open(data.staff.find(x=>x.id===Number(b.dataset.id))))}function storeFields(x){$('#stores').innerHTML=data.stores.map(s=>{const a=x?.staff_store_assignments?.find(z=>z.store_id===s.id&&z.active);return `<label><input type="checkbox" data-store="${s.id}" ${a?'checked':''}><b>${esc(s.name)}</b><select data-role="${s.id}" style="margin-left:auto;width:auto"><option value="staff" ${a?.role==='staff'?'selected':''}>スタッフ</option><option value="manager" ${a?.role==='manager'?'selected':''}>店長</option><option value="owner" ${a?.role==='owner'?'selected':''}>オーナー</option></select></label>`}).join('')}function open(x=null){$('#staffId').value=x?.id||'';$('#title').textContent=x?'スタッフ編集':'スタッフ追加';$('#name').value=x?.display_name||'';$('#type').value=x?.employment_type||'part_time';$('#wage').value=x?.hourly_wage??1100;$('#salary').value=x?.monthly_salary??200000;$('#nationality').value=x?.nationality||'';$('#note').value=x?.note||'';$('#deactivate').hidden=!x;$('#deactivate').textContent=x?.active?'退職・名簿から外す':'復職させる';storeFields(x);togglePay();$('#formMsg').textContent='';$('#modal').classList.add('open')}function togglePay(){const fixed=$('#type').value==='fixed_salary';$('#wageBox').hidden=fixed;$('#salaryBox').hidden=!fixed}async function save(){const assignments=[...document.querySelectorAll('[data-store]:checked')].map(c=>({store_id:Number(c.dataset.store),role:document.querySelector(`[data-role="${c.dataset.store}"]`).value})),id=Number($('#staffId').value||0);try{$('#save').disabled=true;await call('POST',{action:id?'update':'create',staff_id:id||undefined,display_name:$('#name').value,employment_type:$('#type').value,hourly_wage:Number($('#wage').value),monthly_salary:Number($('#salary').value),nationality:$('#nationality').value,note:$('#note').value,assignments});$('#modal').classList.remove('open');await load()}catch(e){$('#formMsg').textContent=e.message}finally{$('#save').disabled=false}}async function deactivate(){const x=data.staff.find(z=>z.id===Number($('#staffId').value));if(!x)return;if(x.active&&!confirm(`${x.display_name}さんを退職扱いにしますか？\n過去の勤務記録は残ります。`))return;try{await call('POST',{action:x.active?'deactivate':'reactivate',staff_id:x.id});$('#modal').classList.remove('open');await load()}catch(e){$('#formMsg').textContent=e.message}}async function load(){try{data=await call();$('#msg').textContent='';render()}catch(e){$('#msg').textContent=e.message}}$('#add').onclick=()=>open();$('#cancel').onclick=()=>$('#modal').classList.remove('open');$('#save').onclick=save;$('#deactivate').onclick=deactivate;$('#type').onchange=togglePay;load()})();</script></body></html>
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>スタッフ名簿｜MACHI ORDER</title>
+    <link rel="stylesheet" href="/machi-design-system.css" />
+    <script src="/machi-ui-config.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f5f2ed;
+        color: #171717;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Noto Sans JP", sans-serif;
+      }
+      .top {
+        background: #d92d2d;
+        color: #fff;
+        padding: 22px 18px;
+      }
+      .top a {
+        color: #fff;
+        text-decoration: none;
+      }
+      .top h1 {
+        margin: 12px 0 2px;
+        font-size: 30px;
+      }
+      .wrap {
+        max-width: 820px;
+        margin: auto;
+        padding: 15px 14px 100px;
+      }
+      .toolbar,
+      .card,
+      .modalbox {
+        background: #fff;
+        border-radius: 20px;
+        padding: 16px;
+        margin: 11px 0;
+        border: 1px solid #e4ded7;
+      }
+      .filters {
+        display: flex;
+        gap: 7px;
+        overflow: auto;
+        margin-top: 12px;
+      }
+      .filters button {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 15px;
+        white-space: nowrap;
+        font-weight: 800;
+      }
+      .filters button.on {
+        background: #171717;
+        color: #fff;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .stat {
+        background: #fff;
+        border-radius: 16px;
+        padding: 14px;
+      }
+      .stat small {
+        display: block;
+        color: #777;
+        font-weight: 700;
+      }
+      .stat b {
+        font-size: 25px;
+      }
+      .staff {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+      }
+      .name {
+        font-size: 21px;
+        font-weight: 900;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin: 8px 0;
+      }
+      .chip {
+        font-size: 12px;
+        background: #f1eee9;
+        border-radius: 999px;
+        padding: 5px 9px;
+        font-weight: 700;
+      }
+      .pay {
+        font-weight: 800;
+        color: #555;
+      }
+      .muted {
+        color: #777;
+        font-size: 13px;
+      }
+      .btn {
+        border: 0;
+        border-radius: 13px;
+        padding: 12px 15px;
+        font-weight: 900;
+      }
+      .primary {
+        background: #171717;
+        color: #fff;
+      }
+      .red {
+        background: #d92d2d;
+        color: #fff;
+      }
+      .edit {
+        align-self: start;
+      }
+      .add {
+        width: 100%;
+        font-size: 17px;
+      }
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: #0008;
+        display: none;
+        z-index: 20;
+        padding: 18px;
+        overflow: auto;
+      }
+      .modal.open {
+        display: block;
+      }
+      .modalbox {
+        max-width: 580px;
+        margin: 30px auto;
+      }
+      .field {
+        margin: 13px 0;
+      }
+      .field label {
+        display: block;
+        font-weight: 800;
+        margin-bottom: 6px;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        padding: 13px;
+        border: 1px solid #ccc;
+        border-radius: 12px;
+        font-size: 16px;
+      }
+      .stores label {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        padding: 10px;
+        background: #f5f2ed;
+        border-radius: 11px;
+        margin: 7px 0;
+      }
+      .stores input {
+        width: 20px;
+        height: 20px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      .actions button {
+        flex: 1;
+      }
+      .inactive {
+        opacity: 0.55;
+      }
+      .msg {
+        min-height: 22px;
+        color: #b42318;
+        font-weight: 700;
+      }
+      @media (max-width: 520px) {
+        .summary {
+          grid-template-columns: 1fr 1fr;
+        }
+        .summary .stat:last-child {
+          grid-column: 1/-1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <a href="/manager.html">← 店長ホーム</a>
+      <h1>スタッフ名簿</h1>
+      <div>長浜店・白木原店／給与・所属を一元管理</div>
+    </header>
+    <main class="wrap">
+      <section class="toolbar">
+        <a
+          class="btn primary add"
+          href="/payroll.html"
+          style="
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            margin-bottom: 8px;
+          "
+          >📅 シフト・勤怠・給与を見る</a
+        ><button class="btn red add" id="add">＋ 新しいスタッフを追加</button>
+        <div class="filters" id="filters"></div>
+      </section>
+      <section class="summary">
+        <div class="stat"><small>在籍</small><b id="active">—</b></div>
+        <div class="stat"><small>アルバイト</small><b id="part">—</b></div>
+        <div class="stat"><small>固定給</small><b id="fixed">—</b></div>
+      </section>
+      <div id="msg" class="msg"></div>
+      <section id="list"></section>
+    </main>
+    <div class="modal" id="modal">
+      <div class="modalbox">
+        <h2 id="title">スタッフ追加</h2>
+        <input type="hidden" id="staffId" />
+        <div class="field">
+          <label>氏名</label><input id="name" maxlength="80" />
+        </div>
+        <div class="field">
+          <label>給与区分</label
+          ><select id="type">
+            <option value="part_time">アルバイト（時給）</option>
+            <option value="fixed_salary">固定給（月給）</option>
+          </select>
+        </div>
+        <div class="field" id="wageBox">
+          <label>時給</label
+          ><input id="wage" type="number" min="0" placeholder="時給を入力" />
+        </div>
+        <div class="field" id="salaryBox" hidden>
+          <label>月給</label
+          ><input id="salary" type="number" min="0" placeholder="月給を入力" />
+        </div>
+        <div class="field">
+          <label>勤務店舗・役割</label>
+          <div class="stores" id="stores"></div>
+        </div>
+        <div class="field">
+          <label>国籍・補足（任意）</label
+          ><input id="nationality" maxlength="80" />
+        </div>
+        <div class="field">
+          <label>メモ（任意）</label
+          ><textarea id="note" maxlength="500"></textarea>
+        </div>
+        <div class="msg" id="formMsg"></div>
+        <div class="actions">
+          <button class="btn" id="cancel">閉じる</button
+          ><button class="btn primary" id="save">保存</button>
+        </div>
+        <button
+          class="btn"
+          id="deactivate"
+          style="width: 100%; margin-top: 10px; color: #b42318"
+          hidden
+        >
+          退職・名簿から外す
+        </button>
+      </div>
+    </div>
+    <script>
+      (() => {
+        const API =
+            "https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/staff-admin-api",
+          $ = (s) => document.querySelector(s),
+          token = () =>
+            localStorage.machi_access_token ||
+            localStorage.mo_staff_token ||
+            "";
+        let data = { stores: [], staff: [] },
+          filter = "all";
+        if (!token()) {
+          location.replace("/login.html?next=/staff-management.html");
+          return;
+        }
+        const esc = (s) =>
+            String(s ?? "").replace(
+              /[&<>"']/g,
+              (c) =>
+                ({
+                  "&": "&amp;",
+                  "<": "&lt;",
+                  ">": "&gt;",
+                  '"': "&quot;",
+                  "'": "&#39;",
+                })[c],
+            ),
+          yen = (n) => "¥" + Number(n || 0).toLocaleString();
+        async function call(method = "GET", body) {
+          const r = await fetch(API, {
+              method,
+              headers: {
+                Authorization: "Bearer " + token(),
+                "Content-Type": "application/json",
+              },
+              body: body ? JSON.stringify(body) : undefined,
+            }),
+            j = await r.json().catch(() => ({}));
+          if (r.status === 401) {
+            location.replace("/login.html?next=/staff-management.html");
+            return;
+          }
+          if (!r.ok) throw Error(j.error || "処理できません");
+          return j;
+        }
+        function render() {
+          const active = data.staff.filter((x) => x.active);
+          $("#active").textContent = active.length + "名";
+          $("#part").textContent =
+            active.filter((x) => x.employment_type === "part_time").length +
+            "名";
+          $("#fixed").textContent =
+            active.filter((x) => x.employment_type === "fixed_salary").length +
+            "名";
+          $("#filters").innerHTML = [
+            "all",
+            "inactive",
+            ...data.stores.map((x) => String(x.id)),
+          ]
+            .map(
+              (v) =>
+                `<button data-f="${v}" class="${filter === v ? "on" : ""}">${v === "all" ? "全員" : v === "inactive" ? "退職者" : esc(data.stores.find((x) => String(x.id) === v)?.name)}</button>`,
+            )
+            .join("");
+          document.querySelectorAll("[data-f]").forEach(
+            (b) =>
+              (b.onclick = () => {
+                filter = b.dataset.f;
+                render();
+              }),
+          );
+          let rows = data.staff.filter((x) =>
+            filter === "all"
+              ? x.active
+              : filter === "inactive"
+                ? !x.active
+                : x.active &&
+                  x.staff_store_assignments.some(
+                    (a) => a.active && String(a.store_id) === filter,
+                  ),
+          );
+          $("#list").innerHTML =
+            rows
+              .map((x) => {
+                const as = x.staff_store_assignments.filter((a) => a.active),
+                  stores = as
+                    .map((a) => {
+                      let s = data.stores.find((z) => z.id === a.store_id),
+                        role =
+                          a.role === "manager"
+                            ? "・店長"
+                            : a.role === "owner"
+                              ? "・オーナー"
+                              : "";
+                      return `<span class="chip">${esc(s?.name || "店舗")}${role}</span>`;
+                    })
+                    .join(""),
+                  pay =
+                    x.employment_type === "fixed_salary"
+                      ? `固定給 ${yen(x.monthly_salary)}／月`
+                      : `時給 ${yen(x.hourly_wage)}`;
+                return `<article class="card staff ${x.active ? "" : "inactive"}"><div><div class="name">${esc(x.display_name)}</div><div class="chips">${stores || '<span class="chip">所属なし</span>'}${x.nationality ? `<span class="chip">${esc(x.nationality)}</span>` : ""}</div><div class="pay">${pay}</div><div class="muted">${x.auth_user_id ? "ログイン連携済み" : "ログイン未連携"}${x.active ? "" : "・退職済み"}</div></div><button class="btn edit" data-id="${x.id}">${x.active ? "編集" : "確認"}</button></article>`;
+              })
+              .join("") ||
+            '<div class="card muted">該当するスタッフはいません</div>';
+          document
+            .querySelectorAll(".edit")
+            .forEach(
+              (b) =>
+                (b.onclick = () =>
+                  open(data.staff.find((x) => x.id === Number(b.dataset.id)))),
+            );
+        }
+        function storeFields(x) {
+          $("#stores").innerHTML = data.stores
+            .map((s) => {
+              const a = x?.staff_store_assignments?.find(
+                (z) => z.store_id === s.id && z.active,
+              );
+              return `<label><input type="checkbox" data-store="${s.id}" ${a ? "checked" : ""}><b>${esc(s.name)}</b><select data-role="${s.id}" style="margin-left:auto;width:auto"><option value="staff" ${a?.role === "staff" ? "selected" : ""}>スタッフ</option><option value="manager" ${a?.role === "manager" ? "selected" : ""}>店長</option><option value="owner" ${a?.role === "owner" ? "selected" : ""}>オーナー</option></select></label>`;
+            })
+            .join("");
+        }
+        function open(x = null) {
+          $("#staffId").value = x?.id || "";
+          $("#title").textContent = x ? "スタッフ編集" : "スタッフ追加";
+          $("#name").value = x?.display_name || "";
+          $("#type").value = x?.employment_type || "part_time";
+          $("#wage").value = x?.hourly_wage ?? "";
+          $("#salary").value = x?.monthly_salary ?? "";
+          $("#nationality").value = x?.nationality || "";
+          $("#note").value = x?.note || "";
+          $("#deactivate").hidden = !x;
+          $("#deactivate").textContent = x?.active
+            ? "退職・名簿から外す"
+            : "復職させる";
+          storeFields(x);
+          togglePay();
+          $("#formMsg").textContent = "";
+          $("#modal").classList.add("open");
+        }
+        function togglePay() {
+          const fixed = $("#type").value === "fixed_salary";
+          $("#wageBox").hidden = fixed;
+          $("#salaryBox").hidden = !fixed;
+        }
+        async function save() {
+          const assignments = [
+              ...document.querySelectorAll("[data-store]:checked"),
+            ].map((c) => ({
+              store_id: Number(c.dataset.store),
+              role: document.querySelector(`[data-role="${c.dataset.store}"]`)
+                .value,
+            })),
+            id = Number($("#staffId").value || 0);
+          try {
+            $("#save").disabled = true;
+            await call("POST", {
+              action: id ? "update" : "create",
+              staff_id: id || undefined,
+              display_name: $("#name").value,
+              employment_type: $("#type").value,
+              hourly_wage: Number($("#wage").value),
+              monthly_salary: Number($("#salary").value),
+              nationality: $("#nationality").value,
+              note: $("#note").value,
+              assignments,
+            });
+            $("#modal").classList.remove("open");
+            await load();
+          } catch (e) {
+            $("#formMsg").textContent = e.message;
+          } finally {
+            $("#save").disabled = false;
+          }
+        }
+        async function deactivate() {
+          const x = data.staff.find(
+            (z) => z.id === Number($("#staffId").value),
+          );
+          if (!x) return;
+          if (
+            x.active &&
+            !confirm(
+              `${x.display_name}さんを退職扱いにしますか？\n過去の勤務記録は残ります。`,
+            )
+          )
+            return;
+          try {
+            await call("POST", {
+              action: x.active ? "deactivate" : "reactivate",
+              staff_id: x.id,
+            });
+            $("#modal").classList.remove("open");
+            await load();
+          } catch (e) {
+            $("#formMsg").textContent = e.message;
+          }
+        }
+        async function load() {
+          try {
+            data = await call();
+            $("#msg").textContent = "";
+            render();
+          } catch (e) {
+            $("#msg").textContent = e.message;
+          }
+        }
+        $("#add").onclick = () => open();
+        $("#cancel").onclick = () => $("#modal").classList.remove("open");
+        $("#save").onclick = save;
+        $("#deactivate").onclick = deactivate;
+        $("#type").onchange = togglePay;
+        load();
+      })();
+    </script>
+  </body>
+</html>
