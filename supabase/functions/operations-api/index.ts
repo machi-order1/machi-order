@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const headers = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Content-Type': 'application/json; charset=utf-8',
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers })
@@ -11,7 +11,6 @@ const managerRoles = new Set(['owner', 'admin', 'manager'])
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers })
-  if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
   try {
     const url = Deno.env.get('SUPABASE_URL')!
     const authorization = req.headers.get('Authorization') || ''
@@ -23,12 +22,27 @@ Deno.serve(async (req: Request) => {
     const storeId = Number(parsed.searchParams.get('store_id') || 1)
     if (!Number.isInteger(storeId) || storeId < 1) return json({ error: '店舗が正しくありません' }, 400)
     const { data: membership } = await sb.from('store_memberships').select('role').eq('store_id', storeId).eq('user_id', user.id).eq('active', true).maybeSingle()
-    if (!membership || !managerRoles.has(membership.role)) return json({ error: '操作履歴は店長のみ確認できます' }, 403)
+    if (!membership) return json({ error: '店舗の権限がありません' }, 403)
+
+    if (req.method === 'POST') {
+      const body = await req.json().catch(() => ({}))
+      if (body.action !== 'handoff') return json({ error: '未対応の操作です' }, 400)
+      const message = String(body.message || '').trim().slice(0, 500)
+      if (!message) return json({ error: '引継ぎ内容を入力してください' }, 400)
+      const priority = body.priority === 'high' ? 'high' : 'normal'
+      const businessDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date())
+      const { data: handoff, error } = await sb.from('store_handoffs').insert({ store_id: storeId, business_date: businessDate, category: 'handoff', message, priority, created_by: user.id }).select().single()
+      if (error) throw error
+      await sb.from('audit_logs').insert({ store_id: storeId, user_id: user.id, action: 'handoff_created', entity_type: 'store_handoff', entity_id: String(handoff.id), details: { business_date: businessDate, priority } })
+      return json({ ok: true, handoff })
+    }
+    if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+    if (!managerRoles.has(membership.role)) return json({ error: '操作履歴は店長のみ確認できます' }, 403)
 
     const { data: logs, error } = await sb.from('audit_logs')
       .select('id,user_id,action,entity_type,entity_id,details,created_at')
       .eq('store_id', storeId)
-      .in('action', ['sale_status_changed', 'happy_hour_changed', 'ordering_changed', 'opening_check_completed', 'payment_completed', 'payment_reverted'])
+      .in('action', ['sale_status_changed', 'happy_hour_changed', 'ordering_changed', 'opening_check_completed', 'payment_completed', 'payment_reverted', 'daily_closing_completed', 'inventory_count_recorded', 'handoff_created'])
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) throw error
