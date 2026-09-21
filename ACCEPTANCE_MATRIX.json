@@ -3,6 +3,10 @@
     "status": "ready_for_safe_test",
     "blocker": null
   },
+  "today_tasks": {
+    "status": "api_ready",
+    "blocker": "authenticated E2E on store device"
+  },
   "kitchen": {
     "status": "ui_ready",
     "blocker": "authenticated E2E"
