@@ -1,1 +1,49 @@
-<!doctype html><html lang=ja><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>人件費</title><style>body{font-family:-apple-system,sans-serif;background:#f5f5f5;margin:0}main{max-width:760px;margin:auto;padding:16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.c{background:#fff;border-radius:15px;padding:16px}.n{font-size:27px;font-weight:800}.muted{color:#666}button,input{width:100%;box-sizing:border-box;padding:11px;font-size:16px}</style><main><h1>💰 売上 × 人件費</h1><div class=c><input id=t placeholder="ログイントークン"><button onclick=load()>今日を更新</button></div><div class=grid><div class=c><div class=muted>売上</div><div id=s class=n>—</div></div><div class=c><div class=muted>実働人件費</div><div id=l class=n>—</div></div><div class=c><div class=muted>人件費率</div><div id=r class=n>—</div></div><div class=c><div class=muted>実働時間</div><div id=h class=n>—</div></div><div class=c><div class=muted>1人時売上</div><div id=p class=n>—</div></div></div><p>※打刻済み勤務は「退勤−休憩」で実働を計算。時給スナップショットを掛けて概算人件費を表示。</p></main><script>const A='https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/dashboard-api?store_id=1&range=today';t.value=localStorage.mo_staff_token||'';async function load(){localStorage.mo_staff_token=t.value.trim();let q=await fetch(A,{headers:{Authorization:'Bearer '+localStorage.mo_staff_token}}),j=await q.json(),x=j.summary;if(!q.ok||!x){alert(j.error||'読込失敗');return}s.textContent='¥'+x.sales.toLocaleString();l.textContent='¥'+x.labor_cost.toLocaleString();r.textContent=x.labor_ratio+'%';h.textContent=x.worked_hours+'h';p.textContent='¥'+x.sales_per_labor_hour.toLocaleString()}</script></html>
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/machi-design-system.css">
+  <script src="/machi-ui-config.js"></script>
+  <title>売上・人件費｜MACHI ORDER</title>
+  <style>body{font-family:-apple-system,sans-serif;background:#f5f5f5;margin:0;color:#222}main{max-width:760px;margin:auto;padding:16px 16px 90px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.c{background:#fff;border-radius:15px;padding:16px}.n{font-size:27px;font-weight:800}.muted{color:#666;font-size:13px}.error{color:#b71920}button{width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:0;border-radius:12px;background:#171717;color:#fff;font-weight:900}@media(max-width:480px){.grid{grid-template-columns:1fr}}</style>
+</head>
+<body>
+<main>
+  <h1>💰 売上 × 人件費</h1>
+  <div class="c" style="margin-bottom:10px"><button id="refresh" type="button">今日を更新</button><div id="msg" class="muted"></div></div>
+  <div class="grid">
+    <div class="c"><div class="muted">売上</div><div id="sales" class="n">—</div></div>
+    <div class="c"><div class="muted">実働人件費</div><div id="labor" class="n">—</div></div>
+    <div class="c"><div class="muted">人件費率</div><div id="ratio" class="n">—</div></div>
+    <div class="c"><div class="muted">実働時間</div><div id="hours" class="n">—</div></div>
+    <div class="c"><div class="muted">1人時売上</div><div id="perHour" class="n">—</div></div>
+  </div>
+  <p class="muted">打刻済み勤務は「退勤−休憩」で実働を計算し、時給スナップショットを掛けた概算です。</p>
+</main>
+<script>
+const STORE_ID=[1,2].includes(Number(new URLSearchParams(location.search).get('store_id')))?Number(new URLSearchParams(location.search).get('store_id')):1;
+const API='https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/dashboard-api?store_id='+STORE_ID+'&range=today';
+const token=()=>localStorage.machi_access_token||localStorage.mo_staff_token||localStorage.access_token||localStorage.sb_access_token||'';
+const login=()=>location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search));
+const yen=n=>'¥'+Number(n||0).toLocaleString('ja-JP');
+async function load(){
+  const access=token();if(!access){login();return}
+  const msg=document.getElementById('msg');msg.className='muted';msg.textContent='確認中…';
+  try{
+    const response=await fetch(API,{headers:{Authorization:'Bearer '+access}});
+    const data=await response.json().catch(()=>({}));if(response.status===401){login();return}
+    if(!response.ok||!data.summary)throw Error(data.error||'読込に失敗しました');
+    const x=data.summary;
+    document.getElementById('sales').textContent=yen(x.sales);
+    document.getElementById('labor').textContent=yen(x.labor_cost);
+    document.getElementById('ratio').textContent=Number(x.labor_ratio||0).toLocaleString()+'%';
+    document.getElementById('hours').textContent=Number(x.worked_hours||0).toLocaleString()+'h';
+    document.getElementById('perHour').textContent=yen(x.sales_per_labor_hour);
+    msg.textContent=(STORE_ID===2?'白木原店':'長浜店')+'・更新 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  }catch(error){msg.className='muted error';msg.textContent=error.message}
+}
+document.getElementById('refresh').addEventListener('click',load);load();if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+</script>
+</body>
+</html>
