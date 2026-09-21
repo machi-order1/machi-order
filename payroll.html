@@ -208,6 +208,19 @@
       </p>
       <div id="msg" class="msg"></div>
       <div id="attendanceAlerts" class="panel" role="status" hidden></div>
+      <section class="panel">
+        <label for="viewMode">表示方法</label>
+        <select id="viewMode">
+          <option value="staff">スタッフ別</option>
+          <option value="date">日付別・店舗別</option></select
+        ><button class="btn" id="exportAttendance" disabled>
+          勤怠CSVを保存
+        </button>
+        <p class="muted">
+          CSVは選択中の月・店舗の勤怠明細です。個人情報を含むため、管理用に保管してください。
+        </p>
+      </section>
+      <div id="dateList" hidden></div>
       <div id="list"></div>
     </main>
     <div class="modal" id="shiftModal">
@@ -293,7 +306,8 @@
                 })[c],
             );
         let data = { staff: [], stores: [], summary: {} },
-          loadedStores = false;
+          loadedStores = false,
+          loadVersion = 0;
         if (!tok()) {
           location.replace("/login.html?next=/payroll.html");
           return;
@@ -432,8 +446,15 @@
             );
         }
         async function load() {
+          const version = ++loadVersion;
+          $("#exportAttendance").disabled = true;
+          $("#list").innerHTML = "";
+          $("#dateList").innerHTML = "";
+          $("#attendanceAlerts").hidden = true;
           try {
-            data = await api();
+            const fresh = await api();
+            if (version !== loadVersion || !fresh) return;
+            data = fresh;
             if (!loadedStores) {
               $("#store").innerHTML =
                 '<option value="">全店舗（会社合計）</option>' +
@@ -453,7 +474,10 @@
               .join("");
             $("#msg").textContent = "";
             render();
+            renderDates();
+            $("#exportAttendance").disabled = false;
           } catch (e) {
+            if (version !== loadVersion) return;
             $("#msg").textContent = e.message;
           }
         }
@@ -538,6 +562,158 @@
           if (edit) editShift(Number(edit.dataset.edit));
           if (cancel) cancelShift(Number(cancel.dataset.cancel));
         });
+
+        function shiftRows() {
+          return (data.staff || [])
+            .flatMap((p) =>
+              (p.shifts || []).map((x) => ({
+                ...x,
+                staff_name: p.display_name,
+              })),
+            )
+            .sort(
+              (a, b) =>
+                a.shift_date.localeCompare(b.shift_date) ||
+                a.store_id - b.store_id ||
+                String(a.scheduled_start || "").localeCompare(
+                  String(b.scheduled_start || ""),
+                ) ||
+                a.staff_name.localeCompare(b.staff_name, "ja"),
+            );
+        }
+        const stateLabel = (x) =>
+          ({
+            scheduled: "勤務予定",
+            working: "勤務中",
+            completed: "勤怠確定",
+            cancelled: "取消",
+          })[x.status] || x.status;
+        function renderDates() {
+          const rows = shiftRows(),
+            groups = new Map();
+          for (const x of rows) {
+            const key = x.shift_date + "|" + x.store_id;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(x);
+          }
+          $("#dateList").innerHTML =
+            Array.from(groups.values())
+              .map((xs) => {
+                const x = xs[0],
+                  weekday = new Date(
+                    x.shift_date + "T12:00:00+09:00",
+                  ).toLocaleDateString("ja-JP", {
+                    timeZone: "Asia/Tokyo",
+                    weekday: "short",
+                  });
+                return (
+                  '<article class="card"><h2>' +
+                  esc(x.shift_date) +
+                  "（" +
+                  esc(weekday) +
+                  "） " +
+                  esc(
+                    data.stores.find((s) => s.id === x.store_id)?.name || "",
+                  ) +
+                  '</h2><div class="muted">登録 ' +
+                  new Set(
+                    xs.map((s) => s.staff_id || s.roster_staff_id || s.user_id),
+                  ).size +
+                  "人・" +
+                  xs.length +
+                  "枠</div>" +
+                  xs
+                    .map(
+                      (s) =>
+                        '<div class="shift"><b>' +
+                        esc(s.staff_name) +
+                        "</b> " +
+                        esc(
+                          (s.scheduled_start || "").slice(0, 5) +
+                            "〜" +
+                            (s.scheduled_end || "").slice(0, 5),
+                        ) +
+                        ' <span class="badge">' +
+                        esc(stateLabel(s)) +
+                        "</span></div>",
+                    )
+                    .join("") +
+                  "</article>"
+                );
+              })
+              .join("") ||
+            '<div class="panel">この月・店舗に登録されたシフトはありません。</div>';
+          $("#dateList").hidden = $("#viewMode").value !== "date";
+          $("#list").hidden = $("#viewMode").value === "date";
+        }
+        function csvCell(value) {
+          let s = String(value ?? "");
+          if (/^[\s]*[=+@-]/.test(s) || /^[\t\r\n]/.test(s)) s = "'" + s;
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        function exportAttendance() {
+          const rows = shiftRows();
+          const table = [
+            [
+              "勤務日",
+              "店舗",
+              "スタッフ",
+              "予定開始",
+              "予定終了",
+              "出勤（日本時間）",
+              "退勤（日本時間）",
+              "休憩分",
+              "実働分",
+              "状態",
+            ],
+          ];
+          for (const x of rows) {
+            const complete = x.clock_in && x.clock_out;
+            const minutes = complete
+              ? Math.max(
+                  0,
+                  Math.round(
+                    (new Date(x.clock_out) - new Date(x.clock_in)) / 60000,
+                  ) - Number(x.break_minutes || 0),
+                )
+              : "";
+            table.push([
+              x.shift_date,
+              data.stores.find((s) => s.id === x.store_id)?.name || "",
+              x.staff_name,
+              (x.scheduled_start || "").slice(0, 5),
+              (x.scheduled_end || "").slice(0, 5),
+              localInput(x.clock_in).replace("T", " "),
+              localInput(x.clock_out).replace("T", " "),
+              x.break_minutes,
+              minutes,
+              stateLabel(x),
+            ]);
+          }
+          const blob = new Blob(
+            [
+              "\uFEFF" +
+                table.map((row) => row.map(csvCell).join(",")).join("\r\n"),
+            ],
+            { type: "text/csv;charset=utf-8" },
+          );
+          const url = URL.createObjectURL(blob),
+            a = document.createElement("a");
+          a.href = url;
+          a.download =
+            "machi-attendance-" +
+            data.month +
+            "-" +
+            (data.store_id || "all") +
+            ".csv";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        }
+        $("#exportAttendance").onclick = exportAttendance;
+        $("#viewMode").onchange = renderDates;
+
         $("#newShift").onclick = openShift;
         $("#saveShift").onclick = saveShift;
         $("#saveAttendance").onclick = saveAttendance;
