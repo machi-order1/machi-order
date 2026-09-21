@@ -47,6 +47,8 @@ const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, op
 expect('現金受取を明示してから会計完了', cashier.includes('現金を受け取りました'));
 expect('PayPay入金確認を明示してから会計完了', cashier.includes('PayPay側で') && cashier.includes('入金済みを確認'));
 expect('会計完了メッセージを表示', cashier.includes('showToast') && cashier.includes('会計を完了しました'));
+expect('会計でQR・口頭・持帰りを区別', cashier.includes('お客様QR注文') && cashier.includes('スタッフ口頭注文') && cashier.includes('テイクアウト') && cashierApi.includes('entry_channel'));
+expect('会計で件数と合計金額を表示', cashier.includes('reduce((sum,order)=>sum+Number(order.total||0),0)') && cashier.includes('${yen(total)}'));
 expect('会計APIは認証トークン必須', cashier.includes("Authorization:'Bearer '+await token()"));
 expect('本日の会計履歴を検索・支払方法で絞込', cashier.includes('history-search') && cashier.includes('payment-filter') && cashierApi.includes("mode === 'history'"));
 expect('会計完了は10秒表示から取り消せる', cashier.includes('toast-action') && cashier.includes("action:'undo_payment'"));
@@ -64,7 +66,7 @@ expect('営業前チェック完了を担当者付きで記録', opening.include
 expect('操作履歴は店長権限だけ閲覧可能', operationLog.includes('operations-api') && operationsApi.includes('managerRoles'));
 expect('商品・受付・会計の重要操作を監査記録', menuAdminApi.includes('sale_status_changed') && menuAdminApi.includes('ordering_changed') && cashierApi.includes('payment_completed') && cashierApi.includes('payment_reverted'));
 expect('売切・停止を1タップで絞込', productAdmin.includes('quickfilters') && productAdmin.includes('data-status="sold_out"'));
-expect('更新キャッシュ番号', worker.includes("machi-order-v71-26"));
+expect('更新キャッシュ番号', worker.includes("machi-order-v71-29"));
 expect('営業時間外・受付停止を注文前に表示', menu.includes('orderingMessage') && menu.includes('現在は注文できません'));
 expect('店長が注文受付を一時停止・再開できる', productAdmin.includes('set_ordering_enabled') && productAdmin.includes('注文受付を停止中'));
 expect('注文受付停止をAPI側でも返す', menuApi.includes('注文受付を一時停止しています'));
@@ -84,7 +86,7 @@ expect('勤怠APIは二重打刻と休憩中退勤を防止', workforceApi.inclu
 expect('シフト日付検証は数字を正しく受け付ける', workforceApi.includes('/^\\d{4}-\\d{2}-\\d{2}$/') && !workforceApi.includes('/^\\\\d{4}'));
 expect('マイシフトは手入力トークンを廃止', myShifts.includes('machi_access_token') && !myShifts.includes('ログイントークン'));
 expect('スタッフ画面から勤怠打刻へ移動', uiConfig.includes("link.href='/time-clock.html'"));
-expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-26") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
+expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-29") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
 expect('日次締めは保存済みログインを使用', closing.includes('machi_access_token') && !closing.includes('アクセストークン'));
 expect('閉店チェック完了前は締め不可', closing.includes('checksDone()') && closing.includes('data-close-check'));
 expect('現金差額ありは理由入力が必須', closingApi.includes('現金差額があるため') && closingApi.includes('!note'));
