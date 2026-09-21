@@ -4,7 +4,7 @@ const checks = [];
 const source = async (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
 const expect = (name, ok) => checks.push({ name, ok: Boolean(ok) });
 
-const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, operationsApi, today, worker, menu, kitchen, kitchenManifest, shirakibaruKitchen, shirakibaruManifest, kitchenApps, productAdmin, menuAdminApi, menuApi, kitchenApi, orderingGuard, timeClock, myShifts, workforceApi, uiConfig, closing, closingApi, inventory, inventoryApi, systemCheck, offline, inventoryImport, inventoryParser, prep, prepMigration, staffOrder, staffOrderApi, machiApp] = await Promise.all([
+const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, operationsApi, today, manager, worker, menu, kitchen, kitchenManifest, shirakibaruKitchen, shirakibaruManifest, kitchenApps, productAdmin, menuAdminApi, menuApi, kitchenApi, orderingGuard, timeClock, myShifts, workforceApi, uiConfig, closing, closingApi, inventory, inventoryApi, systemCheck, offline, inventoryImport, inventoryParser, prep, prepMigration, staffOrder, staffOrderApi, machiApp] = await Promise.all([
   source('cashier.html'),
   source('supabase/functions/cashier-api/index.ts'),
   source('supabase/migrations/20260921_cashier_payment_undo.sql'),
@@ -14,6 +14,7 @@ const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, op
   source('operation-log.html'),
   source('supabase/functions/operations-api/index.ts'),
   source('today.html'),
+  source('manager.html'),
   source('sw.js'),
   source('index.html'),
   source('kitchen.html'),
@@ -68,7 +69,7 @@ expect('操作履歴は店長権限だけ閲覧可能', operationLog.includes('o
 expect('商品・受付・会計の重要操作を監査記録', menuAdminApi.includes('sale_status_changed') && menuAdminApi.includes('ordering_changed') && cashierApi.includes('payment_completed') && cashierApi.includes('payment_reverted'));
 expect('売切・停止を1タップで絞込', productAdmin.includes('quickfilters') && productAdmin.includes('data-status="sold_out"'));
 expect('商品・売切管理は店舗IDを固定して誤操作防止', productAdmin.includes("STORE_ID=[1,2].includes") && productAdmin.includes("store_id='+STORE_ID") && productAdmin.includes('store_id:STORE_ID') && productAdmin.includes("data.store?.name"));
-expect('更新キャッシュ番号', worker.includes("machi-order-v71-31"));
+expect('更新キャッシュ番号', worker.includes("machi-order-v71-32"));
 expect('営業時間外・受付停止を注文前に表示', menu.includes('orderingMessage') && menu.includes('現在は注文できません'));
 expect('店長が注文受付を一時停止・再開できる', productAdmin.includes('set_ordering_enabled') && productAdmin.includes('注文受付を停止中'));
 expect('注文受付停止をAPI側でも返す', menuApi.includes('注文受付を一時停止しています'));
@@ -88,7 +89,7 @@ expect('勤怠APIは二重打刻と休憩中退勤を防止', workforceApi.inclu
 expect('シフト日付検証は数字を正しく受け付ける', workforceApi.includes('/^\\d{4}-\\d{2}-\\d{2}$/') && !workforceApi.includes('/^\\\\d{4}'));
 expect('マイシフトは手入力トークンを廃止', myShifts.includes('machi_access_token') && !myShifts.includes('ログイントークン'));
 expect('スタッフ画面から勤怠打刻へ移動', uiConfig.includes("link.href='/time-clock.html'"));
-expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-31") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
+expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-32") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
 expect('日次締めは保存済みログインを使用', closing.includes('machi_access_token') && !closing.includes('アクセストークン'));
 expect('閉店チェック完了前は締め不可', closing.includes('checksDone()') && closing.includes('data-close-check'));
 expect('現金差額ありは理由入力が必須', closingApi.includes('現金差額があるため') && closingApi.includes('!note'));
@@ -97,6 +98,8 @@ expect('日次締めを監査記録', closingApi.includes("action: 'daily_closin
 expect('引継ぎ保存APIを実装', operationsApi.includes("body.action !== 'handoff'") && operationsApi.includes("from('store_handoffs')"));
 expect('今日のタスクは専用モードで取得', today.includes('mode=tasks') && operationsApi.includes("get('mode') === 'tasks'") && operationsApi.includes("from('store_tasks')"));
 expect('今日のタスク完了は店舗を照合して記録', operationsApi.includes("body.action === 'task_done'") && operationsApi.includes(".eq('store_id', storeId)") && operationsApi.includes("action: 'store_task_completed'"));
+expect('店長ホームの運営件数は専用集計を使用', manager.includes("get('operations-api','&mode=summary')") && operationsApi.includes("get('mode') === 'summary'") && operationsApi.includes("from('hygiene_checks')"));
+expect('店長ホームは保存済みログインと店舗IDを使用', manager.includes('machi_access_token') && manager.includes('STORE_ID=[1,2].includes') && !manager.includes('placeholder="アクセストークン"'));
 expect('在庫画面は未棚卸と発注候補を区別', inventory.includes('data-filter="unknown"') && inventory.includes('data-filter="reorder"'));
 expect('棚卸入力は確認してから保存', inventory.includes('で記録しますか？') && inventory.includes("action:'count'"));
 expect('棚卸日時と数量をAPI側で検証', inventoryApi.includes('棚卸日時が正しくありません') && inventoryApi.includes('quantity < 0'));
