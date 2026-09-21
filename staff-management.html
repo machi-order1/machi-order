@@ -223,6 +223,19 @@
             margin-bottom: 8px;
           "
           >📅 シフト・勤怠・給与を見る</a
+        ><a
+          class="btn add"
+          href="/attendance-kiosk.html"
+          style="
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            margin-bottom: 8px;
+            background: #fff3f2;
+            color: #b42318;
+            border: 1px solid #f0b5b5;
+          "
+          >⏱ 店舗打刻端末を開く</a
         ><button class="btn red add" id="add">＋ 新しいスタッフを追加</button>
         <div class="filters" id="filters"></div>
       </section>
@@ -263,6 +276,18 @@
         <div class="field">
           <label>国籍・補足（任意）</label
           ><input id="nationality" maxlength="80" />
+        </div>
+        <div class="field">
+          <label>店舗打刻用の暗証番号</label
+          ><input
+            id="kioskPin"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="8"
+            autocomplete="new-password"
+            placeholder="4〜8桁の数字（変更時だけ入力）"
+          />
+          <div class="muted" id="pinStatus">未設定</div>
         </div>
         <div class="field">
           <label>メモ（任意）</label
@@ -384,7 +409,7 @@
                     x.employment_type === "fixed_salary"
                       ? `固定給 ${yen(x.monthly_salary)}／月`
                       : `時給 ${yen(x.hourly_wage)}`;
-                return `<article class="card staff ${x.active ? "" : "inactive"}"><div><div class="name">${esc(x.display_name)}</div><div class="chips">${stores || '<span class="chip">所属なし</span>'}${x.nationality ? `<span class="chip">${esc(x.nationality)}</span>` : ""}</div><div class="pay">${pay}</div><div class="muted">${x.auth_user_id ? "ログイン連携済み" : "ログイン未連携"}${x.active ? "" : "・退職済み"}</div></div><button class="btn edit" data-id="${x.id}">${x.active ? "編集" : "確認"}</button></article>`;
+                return `<article class="card staff ${x.active ? "" : "inactive"}"><div><div class="name">${esc(x.display_name)}</div><div class="chips">${stores || '<span class="chip">所属なし</span>'}${x.nationality ? `<span class="chip">${esc(x.nationality)}</span>` : ""}</div><div class="pay">${pay}</div><div class="muted">${x.auth_user_id ? "ログイン連携済み" : "ログイン未連携"}・店舗打刻${x.kiosk_pin_set ? "設定済み" : "未設定"}${x.active ? "" : "・退職済み"}</div></div><button class="btn edit" data-id="${x.id}">${x.active ? "編集" : "確認"}</button></article>`;
               })
               .join("") ||
             '<div class="card muted">該当するスタッフはいません</div>';
@@ -415,6 +440,10 @@
           $("#salary").value = x?.monthly_salary ?? "";
           $("#nationality").value = x?.nationality || "";
           $("#note").value = x?.note || "";
+          $("#kioskPin").value = "";
+          $("#pinStatus").textContent = x?.kiosk_pin_set
+            ? "設定済み。変更するときだけ新しい番号を入力"
+            : "未設定。店舗端末で打刻するには設定が必要";
           $("#deactivate").hidden = !x;
           $("#deactivate").textContent = x?.active
             ? "退職・名簿から外す"
@@ -449,6 +478,7 @@
               monthly_salary: Number($("#salary").value),
               nationality: $("#nationality").value,
               note: $("#note").value,
+              kiosk_pin: $("#kioskPin").value,
               assignments,
             });
             $("#modal").classList.remove("open");
