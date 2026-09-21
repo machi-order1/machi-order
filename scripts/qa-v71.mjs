@@ -88,6 +88,8 @@ expect('厨房画面から5分端末テストを実行', kitchen.includes('厨�
 expect('勤怠打刻は保存済みログインを使用', timeClock.includes('machi_access_token') && !timeClock.includes('ログイントークン'));
 expect('出勤・休憩・退勤を状態別に操作', timeClock.includes("act('clock_in')") && timeClock.includes("act('break_start')") && timeClock.includes("act('break_end')") && timeClock.includes("act('clock_out')"));
 expect('勤怠APIは二重打刻と休憩中退勤を防止', workforceApi.includes('すでに出勤中です') && workforceApi.includes('休憩終了を押してから退勤してください'));
+expect('オーナー・管理者・店長がシフトを管理', workforceApi.includes("managerRoles=['owner','admin','manager']") && workforceApi.includes('isManager'));
+expect('代打確定の変更履歴を二重登録しない', (workforceApi.match(/change_type:'create',after_data:shift/g) || []).length === 1 && !workforceApi.includes('data:orig'));
 expect('シフト日付検証は数字を正しく受け付ける', workforceApi.includes('/^\\d{4}-\\d{2}-\\d{2}$/') && !workforceApi.includes('/^\\\\d{4}'));
 expect('マイシフトは手入力トークンを廃止', myShifts.includes('machi_access_token') && !myShifts.includes('ログイントークン'));
 expect('スタッフ画面から勤怠打刻へ移動', uiConfig.includes("link.href='/time-clock.html'"));
