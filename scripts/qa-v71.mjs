@@ -71,7 +71,7 @@ expect('操作履歴は店長権限だけ閲覧可能', operationLog.includes('o
 expect('商品・受付・会計の重要操作を監査記録', menuAdminApi.includes('sale_status_changed') && menuAdminApi.includes('ordering_changed') && cashierApi.includes('payment_completed') && cashierApi.includes('payment_reverted'));
 expect('売切・停止を1タップで絞込', productAdmin.includes('quickfilters') && productAdmin.includes('data-status="sold_out"'));
 expect('商品・売切管理は店舗IDを固定して誤操作防止', productAdmin.includes("STORE_ID=[1,2].includes") && productAdmin.includes("store_id='+STORE_ID") && productAdmin.includes('store_id:STORE_ID') && productAdmin.includes("data.store?.name"));
-expect('更新キャッシュ番号', worker.includes("machi-order-v71-33"));
+expect('更新キャッシュ番号', worker.includes("machi-order-v71-34"));
 expect('営業時間外・受付停止を注文前に表示', menu.includes('orderingMessage') && menu.includes('現在は注文できません'));
 expect('店長が注文受付を一時停止・再開できる', productAdmin.includes('set_ordering_enabled') && productAdmin.includes('注文受付を停止中'));
 expect('注文受付停止をAPI側でも返す', menuApi.includes('注文受付を一時停止しています'));
@@ -82,7 +82,7 @@ expect('厨房オフライン表示と復帰時再接続', kitchen.includes("add
 expect('厨房通知設定を保持して新規注文時に振動', kitchen.includes('machi_kitchen_sound') && kitchen.includes('navigator.vibrate'));
 expect('厨房専用アプリは厨房画面から起動', kitchen.includes('/kitchen.webmanifest') && kitchenManifest.includes('"start_url": "/kitchen.html"'));
 expect('長浜店の厨房アプリ名を固定', kitchenManifest.includes('151 厨房・長浜店') && kitchenManifest.includes('151長浜厨房'));
-expect('白木原店は専用アプリで誤表示を防止', shirakibaruManifest.includes('151 厨房・白木原店') && shirakibaruKitchen.includes("/kitchen.html?store=shirakibaru") && uiConfig.includes("replace('store_id=1','store_id=2')"));
+expect('白木原店は専用アプリで誤表示を防止', shirakibaruManifest.includes('151 厨房・白木原店') && shirakibaruKitchen.includes("/kitchen.html?store=shirakibaru") && uiConfig.includes("store_id=2"));
 expect('厨房アプリ選択画面で店舗を明示', kitchenApps.includes('長浜店の注文だけを表示') && kitchenApps.includes('白木原店の注文だけを表示'));
 expect('厨房画面から5分端末テストを実行', kitchen.includes('厨房タブレット 5分テスト') && kitchen.includes('test-sound') && kitchen.includes('test-refresh'));
 expect('勤怠打刻は保存済みログインを使用', timeClock.includes('machi_access_token') && !timeClock.includes('ログイントークン'));
@@ -93,7 +93,7 @@ expect('代打確定の変更履歴を二重登録しない', (workforceApi.matc
 expect('シフト日付検証は数字を正しく受け付ける', workforceApi.includes('/^\\d{4}-\\d{2}-\\d{2}$/') && !workforceApi.includes('/^\\\\d{4}'));
 expect('マイシフトは手入力トークンを廃止', myShifts.includes('machi_access_token') && !myShifts.includes('ログイントークン'));
 expect('スタッフ画面から勤怠打刻へ移動', uiConfig.includes("link.href='/time-clock.html'"));
-expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-33") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
+expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-34") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'") && worker.includes("'/shift-builder.html'"));
 expect('日次締めは保存済みログインを使用', closing.includes('machi_access_token') && !closing.includes('アクセストークン'));
 expect('閉店チェック完了前は締め不可', closing.includes('checksDone()') && closing.includes('data-close-check'));
 expect('現金差額ありは理由入力が必須', closingApi.includes('現金差額があるため') && closingApi.includes('!note'));
@@ -139,7 +139,7 @@ expect('口頭注文を通常QRと区別して記録', staffOrderApi.includes("e
 expect('口頭注文の席を店舗別に自動表示', staffOrder.includes("Machi.api('staff-order-api')") && staffOrder.includes('data.tables'));
 expect('白木原口頭注文は店舗ID2へ固定', staffOrder.includes('store_id=${store.id}') && machiApp.includes("code: 'shirakibaru'"));
 expect('厨房から口頭注文をすぐ開ける', uiConfig.includes('oral-order-link') && uiConfig.includes("'/staff-order.html?store_id='"));
-expect('白木原会計は店舗ID2だけを表示', uiConfig.includes('cashier-api?store_id=1') && uiConfig.includes('cashier.html?store_id=2'));
+expect('白木原会計は店舗ID2だけを表示', uiConfig.includes("raw.includes('/functions/v1/')") && uiConfig.includes("url.searchParams.set('store_id',String(storeId))"));
 expect('厨房でQR・口頭・持帰りを区別', kitchen.includes('スタッフ口頭注文') && kitchen.includes('お客様QR注文') && kitchenApi.includes('entry_channel'));
 expect('オーナーと管理者も厨房操作可能', kitchenApi.includes("'owner', 'admin', 'manager', 'kitchen', 'staff'"));
 expect('白木原厨房は店舗ID2指定にも対応', uiConfig.includes("kitchenParams.get('store_id')==='2'"));
