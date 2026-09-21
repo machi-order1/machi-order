@@ -23,7 +23,7 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === 'GET') {
       const { data, error } = await sb.from('orders')
-        .select('id,status,total,ordered_at,customer_note,order_channel_code,external_order_ref,dining_tables(name,table_number,seat_code,seat_type),order_items(id,product_name_snapshot,quantity,unit_price,customer_note,order_item_options(option_name_snapshot,price_delta))')
+        .select('id,status,total,ordered_at,customer_note,order_channel_code,external_order_ref,dining_tables(name,table_number,seat_code,seat_type),takeout_order_details(customer_name,phone,pickup_at,pickup_status),order_items(id,product_name_snapshot,quantity,unit_price,customer_note,order_item_options(option_name_snapshot,price_delta))')
         .eq('store_id', storeId).in('status', ['new', 'cooking']).order('ordered_at', { ascending: true })
       if (error) throw error
       return json({ role: membership.role, orders: data || [] })
