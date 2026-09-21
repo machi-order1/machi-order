@@ -1,13 +1,13 @@
 {
-  "name": "151 厨房・長浜店",
-  "short_name": "151長浜厨房",
-  "id": "/kitchen.html",
-  "start_url": "/kitchen.html",
+  "name": "151 厨房・白木原店",
+  "short_name": "151白木原厨房",
+  "id": "/kitchen-shirakibaru.html",
+  "start_url": "/kitchen-shirakibaru.html",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f5f5f2",
   "theme_color": "#e51b23",
-  "description": "博多油そば151 長浜店の厨房用アプリ",
+  "description": "博多油そば151 白木原店の厨房用アプリ",
   "icons": [
     { "src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }

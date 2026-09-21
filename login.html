@@ -14,21 +14,23 @@
   <main class="box">
     <header class="brand"><small>MACHI ORDER · STAFF</small><h1>スタッフログイン</h1></header>
     <form class="form" id="login-form">
-      <p class="lead">長浜店の厨房・会計画面を開きます。</p>
+      <p class="lead" id="login-lead">店舗スタッフ用の厨房・会計画面を開きます。</p>
       <label class="field" for="email">メールアドレス</label>
-      <input id="email" name="email" type="email" value="151nagahama@gmail.com" autocomplete="username" autocapitalize="none" required>
+      <input id="email" name="email" type="email" autocomplete="username" autocapitalize="none" required>
       <label class="field" for="password">パスワード</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required>
       <button id="submit" type="submit">ログインして厨房を開く</button>
       <button class="secondary" id="reset" type="button">パスワードを再設定する</button>
       <div class="msg" id="message" role="alert"></div>
     </form>
-    <div class="note">この端末だけにログイン情報を保存します。共用端末を入れ替える場合は、厨房画面からログアウトしてください。</div>
+    <div class="note">この端末だけにログイン情報を保存します。共用端末を入れ替える場合は、厨房画面からログアウトしてください。<br><a href="/kitchen-apps.html">店舗別の厨房アプリを確認</a></div>
   </main>
   <script>
     const SUPABASE='https://tejglrlkaqolbghoagqj.supabase.co';
     const KEY='sb_publishable_beZla85Y6Ngrx0hji9I9rg_FbcRSUoT';
     const next=(()=>{const v=new URLSearchParams(location.search).get('next')||'/kitchen.html';return v.startsWith('/')&&!v.startsWith('//')?v:'/kitchen.html'})();
+    const isShirakibaru=next.startsWith('/kitchen-shirakibaru.html');
+    document.getElementById('login-lead').textContent=(isShirakibaru?'白木原店':'長浜店')+'のスタッフ画面を開きます。';
     function saveSession(j){
       localStorage.setItem('machi_access_token',j.access_token);
       localStorage.setItem('mo_staff_token',j.access_token);
