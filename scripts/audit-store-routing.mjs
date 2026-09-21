@@ -21,7 +21,7 @@ const checks = [
   ['管理APIの固定店舗IDを選択店舗へ補正', config.includes("raw.includes('/functions/v1/')") && config.includes("store_id=2")],
   ['管理画面リンクへ店舗IDを引継ぎ', config.includes('propagateStoreLinks') && config.includes("url.searchParams.set('store_id',String(storeId))")],
   ['認証期限切れ時に1回だけ自動更新', config.includes('refreshPromise') && config.includes("response.status!==401") && config.includes("grant_type=refresh_token")],
-  ['認証更新後も同じ店舗へ再送', config.includes('const retryInput=input instanceof Request?input.clone():input') && config.indexOf('const retryInput=') > config.indexOf("raw.replace(/([?&])store_id=1"))],
+  ['認証更新後も同じ店舗へ再送', config.includes('const retryInput=input instanceof Request?input.clone():input') && config.indexOf('const retryInput=') > config.indexOf("raw.replace(/([?&])store_id=1")],
 ];
 
 for (const [name, ok] of checks) {
