@@ -71,7 +71,7 @@ expect('操作履歴は店長権限だけ閲覧可能', operationLog.includes('o
 expect('商品・受付・会計の重要操作を監査記録', menuAdminApi.includes('sale_status_changed') && menuAdminApi.includes('ordering_changed') && cashierApi.includes('payment_completed') && cashierApi.includes('payment_reverted'));
 expect('売切・停止を1タップで絞込', productAdmin.includes('quickfilters') && productAdmin.includes('data-status="sold_out"'));
 expect('商品・売切管理は店舗IDを固定して誤操作防止', productAdmin.includes("STORE_ID=[1,2].includes") && productAdmin.includes("store_id='+STORE_ID") && productAdmin.includes('store_id:STORE_ID') && productAdmin.includes("data.store?.name"));
-expect('更新キャッシュ番号', worker.includes("machi-order-v71-34"));
+expect('更新キャッシュ番号', worker.includes("machi-order-v71-35"));
 expect('営業時間外・受付停止を注文前に表示', menu.includes('orderingMessage') && menu.includes('現在は注文できません'));
 expect('店長が注文受付を一時停止・再開できる', productAdmin.includes('set_ordering_enabled') && productAdmin.includes('注文受付を停止中'));
 expect('注文受付停止をAPI側でも返す', menuApi.includes('注文受付を一時停止しています'));
@@ -93,7 +93,7 @@ expect('代打確定の変更履歴を二重登録しない', (workforceApi.matc
 expect('シフト日付検証は数字を正しく受け付ける', workforceApi.includes('/^\\d{4}-\\d{2}-\\d{2}$/') && !workforceApi.includes('/^\\\\d{4}'));
 expect('マイシフトは手入力トークンを廃止', myShifts.includes('machi_access_token') && !myShifts.includes('ログイントークン'));
 expect('スタッフ画面から勤怠打刻へ移動', uiConfig.includes("link.href='/time-clock.html'"));
-expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-34") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'") && worker.includes("'/shift-builder.html'"));
+expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-35") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'") && worker.includes("'/shift-builder.html'"));
 expect('日次締めは保存済みログインを使用', closing.includes('machi_access_token') && !closing.includes('アクセストークン'));
 expect('閉店チェック完了前は締め不可', closing.includes('checksDone()') && closing.includes('data-close-check'));
 expect('現金差額ありは理由入力が必須', closingApi.includes('現金差額があるため') && closingApi.includes('!note'));
@@ -143,6 +143,8 @@ expect('白木原会計は店舗ID2だけを表示', uiConfig.includes("raw.incl
 expect('厨房でQR・口頭・持帰りを区別', kitchen.includes('スタッフ口頭注文') && kitchen.includes('お客様QR注文') && kitchenApi.includes('entry_channel'));
 expect('オーナーと管理者も厨房操作可能', kitchenApi.includes("'owner', 'admin', 'manager', 'kitchen', 'staff'"));
 expect('白木原厨房は店舗ID2指定にも対応', uiConfig.includes("kitchenParams.get('store_id')==='2'"));
+expect('新しいスタッフ管理画面もオフライン対象', ['shift-review.html','staff-management.html','attendance-kiosk.html','payroll.html'].every((path) => worker.includes(`/${path}`)));
+expect('店舗ホームに改行記号を表示しない', !((await source('store-command.html')).includes('\\n<div class="wrap"')));
 
 for (const check of checks) console.log(`${check.ok ? 'PASS' : 'FAIL'}  ${check.name}`);
 if (checks.some((check) => !check.ok)) process.exitCode = 1;
