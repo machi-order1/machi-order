@@ -17,12 +17,12 @@ Deno.serve(async (request: Request) => {
     if (!Number.isInteger(storeId) || storeId < 1) return O({ error: '店舗が正しくありません' }, 400)
     const { data: membership } = await sb.from('store_memberships').select('role').eq('user_id', user.id).eq('store_id', storeId).eq('active', true).maybeSingle()
     if (!membership || !['owner','admin','manager','staff'].includes(membership.role)) return O({ error: '権限がありません' }, 403)
-    const { data: store } = await sb.from('stores').select('brand_id,brands(company_id)').eq('id', storeId).single()
+    const { data: store } = await sb.from('stores').select('name,brand_id,brands(company_id)').eq('id', storeId).single()
     const companyId = (store as any)?.brands?.company_id
     if (!companyId) return O({ error: '店舗設定が見つかりません' }, 404)
     if (request.method === 'GET') {
       const [{ data: items }, { data: movements }, { data: counts }] = await Promise.all([
-        sb.from('inventory_items').select('*').eq('company_id', companyId).eq('active', true).order('inventory_class').order('name'),
+        sb.from('inventory_items').select('*').eq('company_id', companyId).eq('active', true).order('sort_order').order('name'),
         sb.from('inventory_movements').select('inventory_item_id,quantity,occurred_at').eq('store_id', storeId),
         sb.from('inventory_counts').select('inventory_item_id,quantity,counted_at').eq('store_id', storeId).order('counted_at', { ascending: false }),
       ])
@@ -36,10 +36,46 @@ Deno.serve(async (request: Request) => {
         const suggestion = stock !== null && item.par_level != null ? Math.max(0, Number(item.par_level) - stock) : 0
         return { ...item, stock_quantity: stock, stock_known: stock !== null, last_counted_at: count?.counted_at || null, needs_reorder: needsReorder, suggested_purchase_quantity: needsReorder ? suggestion : 0 }
       })
-      return O({ items: output, reorder_suggestions: output.filter((item: any) => item.needs_reorder).map((item: any) => ({ inventory_item_id: item.id, name: item.name, current_stock: item.stock_quantity, reorder_level: item.reorder_level, par_level: item.par_level, suggested_quantity: item.suggested_purchase_quantity, unit: item.unit, purchase_location: item.purchase_location })) })
+      return O({ store: { id: storeId, name: (store as any)?.name || '店舗' }, can_manage_items: ['owner','admin','manager'].includes(membership.role), items: output, reorder_suggestions: output.filter((item: any) => item.needs_reorder).map((item: any) => ({ inventory_item_id: item.id, name: item.name, current_stock: item.stock_quantity, reorder_level: item.reorder_level, par_level: item.par_level, suggested_quantity: item.suggested_purchase_quantity, unit: item.unit, purchase_location: item.purchase_location })) })
     }
     if (request.method !== 'POST') return O({ error: 'Method not allowed' }, 405)
-    const body = await request.json().catch(() => ({})), itemId = Number(body.inventory_item_id), quantity = Number(body.quantity)
+    const body = await request.json().catch(() => ({}))
+    if (['item_create','item_update','item_deactivate'].includes(String(body.action))) {
+      if (!['owner','admin','manager'].includes(membership.role)) return O({ error: '品目設定は店長権限が必要です' }, 403)
+      const groups = ['冷蔵庫仕込み在庫','タレ系在庫','冷凍食材在庫','メイン食材在庫','買い出し系食材','飲み物','備品','その他']
+      if (body.action === 'item_deactivate') {
+        const id = Number(body.inventory_item_id)
+        if (!Number.isInteger(id) || id < 1) return O({ error: '品目が正しくありません' }, 400)
+        const { data: item, error } = await sb.from('inventory_items').update({ active: false }).eq('id', id).eq('company_id', companyId).eq('active', true).select('id,name').maybeSingle()
+        if (error) throw error
+        if (!item) return O({ error: '品目が見つかりません' }, 404)
+        await sb.from('audit_logs').insert({ store_id: storeId, user_id: user.id, action: 'inventory_item_deactivated', entity_type: 'inventory_item', entity_id: String(id), details: { name: item.name } })
+        return O({ ok: true, item })
+      }
+      const name = String(body.name || '').trim().slice(0, 80), unit = String(body.unit || '').trim().slice(0, 20), inventoryGroup = String(body.inventory_group || '')
+      if (!name || !unit || !groups.includes(inventoryGroup)) return O({ error: '品目名・単位・グループを確認してください' }, 400)
+      const numberOrNull = (value: unknown) => value === '' || value == null ? null : Number(value)
+      const parLevel = numberOrNull(body.par_level), reorderLevel = numberOrNull(body.reorder_level)
+      if ((parLevel != null && (!Number.isFinite(parLevel) || parLevel < 0)) || (reorderLevel != null && (!Number.isFinite(reorderLevel) || reorderLevel < 0))) return O({ error: '基準在庫と発注点は0以上で入力してください' }, 400)
+      const itemType = ['raw','prepared','sauce','frozen','drink','supply'].includes(String(body.item_type)) ? String(body.item_type) : 'raw'
+      const payload = { name, unit, inventory_group: inventoryGroup, item_type: itemType, inventory_class: inventoryGroup === '備品' ? 'supplies' : inventoryGroup === '飲み物' ? 'beverage' : itemType === 'prepared' ? 'prepared_food' : 'food', par_level: parLevel, reorder_level: reorderLevel, purchase_location: body.purchase_location ? String(body.purchase_location).trim().slice(0, 100) : null, sort_order: groups.indexOf(inventoryGroup) * 1000 + Math.max(0, Math.min(999, Number(body.sort_order) || 500)) }
+      if (body.action === 'item_create') {
+        const { data: duplicate } = await sb.from('inventory_items').select('id,active').eq('company_id', companyId).ilike('name', name).maybeSingle()
+        if (duplicate) return O({ error: duplicate.active ? '同じ名前の品目がすでにあります' : '停止中に同じ名前の品目があります。再開は管理者へ依頼してください' }, 409)
+        const { data: item, error } = await sb.from('inventory_items').insert({ company_id: companyId, ...payload }).select().single()
+        if (error) throw error
+        await sb.from('audit_logs').insert({ store_id: storeId, user_id: user.id, action: 'inventory_item_created', entity_type: 'inventory_item', entity_id: String(item.id), details: payload })
+        return O({ ok: true, item })
+      }
+      const id = Number(body.inventory_item_id)
+      if (!Number.isInteger(id) || id < 1) return O({ error: '品目が正しくありません' }, 400)
+      const { data: item, error } = await sb.from('inventory_items').update(payload).eq('id', id).eq('company_id', companyId).eq('active', true).select().maybeSingle()
+      if (error) throw error
+      if (!item) return O({ error: '品目が見つかりません' }, 404)
+      await sb.from('audit_logs').insert({ store_id: storeId, user_id: user.id, action: 'inventory_item_updated', entity_type: 'inventory_item', entity_id: String(id), details: payload })
+      return O({ ok: true, item })
+    }
+    const itemId = Number(body.inventory_item_id), quantity = Number(body.quantity)
     if (!Number.isInteger(itemId) || itemId < 1 || !Number.isFinite(quantity)) return O({ error: '入力内容を確認してください' }, 400)
     const { data: item } = await sb.from('inventory_items').select('id,name,unit_cost').eq('id', itemId).eq('company_id', companyId).eq('active', true).maybeSingle()
     if (!item) return O({ error: '在庫品目が見つかりません' }, 404)
