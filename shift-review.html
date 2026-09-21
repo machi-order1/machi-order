@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#d92d2d" />
+    <title>シフト希望の確認｜MACHI ORDER</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f5f2ed;
+        color: #171717;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Noto Sans JP", sans-serif;
+      }
+      header {
+        background: #d92d2d;
+        color: white;
+        padding: 24px 18px;
+      }
+      header a {
+        color: white;
+      }
+      h1 {
+        font-size: 28px;
+        margin: 16px 0 6px;
+      }
+      main {
+        max-width: 900px;
+        margin: auto;
+        padding: 16px 16px 70px;
+      }
+      .panel,
+      article {
+        background: white;
+        border: 1px solid #e4ded7;
+        border-radius: 20px;
+        padding: 18px;
+        margin: 12px 0;
+      }
+      .filters {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        font-weight: 700;
+        flex: 1;
+        min-width: 140px;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid #bbb;
+      }
+      button {
+        cursor: pointer;
+        min-height: 48px;
+        font-weight: 800;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+      .primary {
+        background: #d92d2d;
+        color: white;
+        border: 0;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      .muted {
+        color: #666;
+        line-height: 1.7;
+      }
+      .badge {
+        background: #f7efdf;
+        padding: 5px 12px;
+        border-radius: 20px;
+        display: inline-block;
+      }
+      h2 {
+        font-size: 21px;
+        margin: 10px 0;
+      }
+      .note {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #message {
+        color: #b42318;
+        font-weight: 700;
+        min-height: 24px;
+      }
+      #message.ok {
+        color: #176e3b;
+      }
+      .time {
+        font-size: 22px;
+        font-weight: 800;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="/payroll.html">← シフト・勤怠・給与</a>
+      <h1>シフト希望の確認</h1>
+      <div>希望を採用すると勤務予定に登録します</div>
+    </header>
+    <main>
+      <section class="panel">
+        <div class="filters">
+          <label for="month">対象月<input type="month" id="month" /></label>
+          <label for="store"
+            >店舗<select id="store">
+              <option value="">すべて</option>
+            </select></label
+          >
+          <label for="status"
+            >表示<select id="status">
+              <option value="pending">確認待ち</option>
+              <option value="">すべて</option>
+              <option value="approved">確定</option>
+              <option value="declined">見送り</option>
+            </select></label
+          >
+        </div>
+        <p class="muted">
+          本人は店舗打刻画面から希望を提出し、確認結果と確定シフトを確認できます。時間を調整する場合は「シフト・勤怠・給与」で登録してください。
+        </p>
+        <button id="reload">再読み込み</button>
+      </section>
+      <div id="message" role="status"></div>
+      <div id="count" class="muted"></div>
+      <section id="list" aria-label="シフト希望"></section>
+    </main>
+    <script>
+      (() => {
+        const $ = (s) => document.querySelector(s),
+          esc = (s) =>
+            String(s ?? "").replace(
+              /[&<>"']/g,
+              (c) =>
+                ({
+                  "&": "&amp;",
+                  "<": "&lt;",
+                  ">": "&gt;",
+                  '"': "&quot;",
+                  "'": "&#39;",
+                })[c],
+            );
+        const token = () =>
+          localStorage.machi_access_token ||
+          localStorage.mo_staff_token ||
+          localStorage.access_token ||
+          localStorage.sb_access_token ||
+          "";
+        let rows = [],
+          busy = false,
+          loadId = 0;
+        const labels = {
+          pending: "確認待ち",
+          approved: "確定",
+          declined: "見送り",
+        };
+        function message(s, ok = false) {
+          $("#message").textContent = s;
+          $("#message").className = ok ? "ok" : "";
+        }
+        async function api(body) {
+          if (!token())
+            throw Error(
+              "店長ログインが必要です。シフト・勤怠・給与画面からログインしてください。",
+            );
+          const r = await fetch(
+            "https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/attendance-kiosk-api",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + token(),
+              },
+              body: JSON.stringify(body),
+            },
+          );
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw Error(j.error || "読み込みできませんでした");
+          return j;
+        }
+        function render() {
+          const filtered = rows.filter(
+            (x) =>
+              (!$("#store").value ||
+                String(x.store_id) === $("#store").value) &&
+              (!$("#status").value || x.status === $("#status").value),
+          );
+          $("#count").textContent = filtered.length + "件";
+          $("#list").innerHTML =
+            filtered
+              .map(
+                (x) =>
+                  '<article><span class="badge">' +
+                  esc(labels[x.status]) +
+                  "</span><h2>" +
+                  esc(x.staff_roster?.display_name || "スタッフ") +
+                  "</h2><p>" +
+                  esc(x.stores?.name || "") +
+                  " · " +
+                  esc(x.work_date) +
+                  '</p><p class="time">' +
+                  (x.preference === "unavailable"
+                    ? "休み希望"
+                    : esc(
+                        x.start_time.slice(0, 5) +
+                          "〜" +
+                          x.end_time.slice(0, 5),
+                      )) +
+                  '</p><p class="note">' +
+                  esc(x.note) +
+                  "</p>" +
+                  (x.status === "pending"
+                    ? '<div class="actions"><button class="primary" data-id="' +
+                      x.id +
+                      '" data-approve="true">' +
+                      (x.preference === "available"
+                        ? "採用してシフト確定"
+                        : "休み希望を承認") +
+                      '</button><button data-id="' +
+                      x.id +
+                      '" data-approve="false">見送り</button></div>'
+                    : "") +
+                  "</article>",
+              )
+              .join("") ||
+            '<div class="panel">該当する希望はありません。</div>';
+          $("#list")
+            .querySelectorAll("button")
+            .forEach((b) => {
+              b.disabled = busy;
+              b.onclick = () =>
+                review(Number(b.dataset.id), b.dataset.approve === "true");
+            });
+        }
+        async function load() {
+          const id = ++loadId;
+          $("#reload").disabled = true;
+          $("#list").textContent = "読み込み中…";
+          try {
+            const j = await api({
+              action: "request_list",
+              month: $("#month").value,
+            });
+            if (id !== loadId) return;
+            rows = j.requests;
+            const selected = $("#store").value,
+              stores = new Map(
+                rows.map((x) => [String(x.store_id), x.stores?.name || "店舗"]),
+              );
+            $("#store").innerHTML =
+              '<option value="">すべて</option>' +
+              Array.from(
+                stores,
+                ([id, name]) =>
+                  '<option value="' + esc(id) + '">' + esc(name) + "</option>",
+              ).join("");
+            if (stores.has(selected)) $("#store").value = selected;
+            render();
+          } catch (e) {
+            if (id === loadId) {
+              rows = [];
+              $("#list").textContent = "";
+              $("#count").textContent = "";
+              message(e.message);
+            }
+          } finally {
+            if (id === loadId) $("#reload").disabled = false;
+          }
+        }
+        async function review(id, approve) {
+          if (busy) return;
+          const x = rows.find((x) => x.id === id);
+          if (!x) return;
+          busy = true;
+          render();
+          message("");
+          try {
+            await api({
+              action: "request_review",
+              request_id: x.id,
+              revision: x.revision,
+              approve,
+            });
+            message(
+              approve
+                ? "確定しました。本人の画面にも反映されます。"
+                : "見送りにしました。",
+              true,
+            );
+          } catch (e) {
+            message(e.message);
+          } finally {
+            busy = false;
+            await load();
+          }
+        }
+        $("#month").value = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Tokyo",
+        })
+          .format(new Date())
+          .slice(0, 7);
+        $("#month").onchange = () => {
+          message("");
+          load();
+        };
+        $("#store").onchange = render;
+        $("#status").onchange = render;
+        $("#reload").onclick = () => {
+          message("");
+          load();
+        };
+        if (!token()) {
+          $("#list").innerHTML =
+            '<div class="panel"><a href="/login.html?next=/shift-review.html">店長ログインして希望を確認</a></div>';
+        } else load();
+      })();
+    </script>
+  </body>
+</html>

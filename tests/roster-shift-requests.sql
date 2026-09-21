@@ -1,0 +1,47 @@
+begin;
+do $test$
+declare v_staff bigint; v_store bigint; v_other bigint; v_company bigint; v_actor uuid; v_request bigint; v_shift bigint; v_date date := (now() at time zone 'Asia/Tokyo')::date+7; failed boolean;
+begin
+ select m.store_id,m.user_id,b.company_id into v_store,v_actor,v_company from public.store_memberships m join public.stores s on s.id=m.store_id join public.brands b on b.id=s.brand_id where m.active and m.role in ('owner','manager','admin') limit 1;
+ if v_actor is null then raise exception 'test requires manager'; end if;
+ select s.id into v_other from public.stores s join public.brands b on b.id=s.brand_id where b.company_id=v_company and s.id<>v_store limit 1;
+ if v_other is null then raise exception 'test requires second store'; end if;
+ insert into public.staff_roster(company_id,display_name,hourly_wage) values(v_company,'__shift_request_transaction_test__',1100) returning id into v_staff;
+ insert into public.staff_store_assignments(staff_id,store_id) values(v_staff,v_store),(v_staff,v_other);
+ v_request:=public.save_roster_shift_request(v_staff,v_store,v_date,'available','11:00','15:00','test');
+ failed:=false;
+ begin perform public.review_roster_shift_request(v_request,1,true,'00000000-0000-0000-0000-000000000000'); exception when others then failed:=true; end;
+ if not failed then raise exception 'unauthorized approval allowed'; end if;
+ failed:=false;
+ begin perform public.review_roster_shift_request(v_request,2,true,v_actor); exception when others then failed:=true; end;
+ if not failed then raise exception 'stale revision accepted'; end if;
+ v_shift:=public.review_roster_shift_request(v_request,1,true,v_actor);
+ if not exists(select 1 from public.work_shifts where id=v_shift and roster_staff_id=v_staff and scheduled_start='11:00' and status='scheduled') then raise exception 'approval failed to create shift'; end if;
+ failed:=false;
+ begin perform public.review_roster_shift_request(v_request,1,true,v_actor); exception when others then failed:=true; end;
+ if not failed then raise exception 'duplicate approval allowed'; end if;
+ failed:=false;
+ begin perform public.save_roster_shift_request(v_staff,v_store,v_date,'available','12:00','16:00','test'); exception when others then failed:=true; end;
+ if not failed then raise exception 'approved request edit allowed'; end if;
+ -- An existing shift at the other store must block approval at the permitted store.
+ insert into public.work_shifts(store_id,roster_staff_id,shift_date,scheduled_start,scheduled_end,status) values(v_other,v_staff,v_date+1,'12:00','16:00','scheduled');
+ v_request:=public.save_roster_shift_request(v_staff,v_store,v_date+1,'available','11:00','15:00','test');
+ failed:=false;
+ begin perform public.review_roster_shift_request(v_request,1,true,v_actor); exception when others then failed:=true; end;
+ if not failed then raise exception 'cross-store overlap accepted'; end if;
+ if (select status from public.roster_shift_requests where id=v_request)<>'pending' then raise exception 'failed approval changed request'; end if;
+ perform public.review_roster_shift_request(v_request,1,false,v_actor);
+ perform public.save_roster_shift_request(v_staff,v_store,v_date+1,'available','17:00','20:00','revised');
+ if (select revision from public.roster_shift_requests where id=v_request)<>3 then raise exception 'resubmission revision failed'; end if;
+ perform public.review_roster_shift_request(v_request,3,true,v_actor);
+ v_request:=public.save_roster_shift_request(v_staff,v_store,v_date+2,'unavailable',null,null,'rest');
+ perform public.review_roster_shift_request(v_request,1,true,v_actor);
+ if exists(select 1 from public.work_shifts where roster_staff_id=v_staff and shift_date=v_date+2) then raise exception 'rest request created shift'; end if;
+ failed:=false;
+ begin perform public.save_roster_shift_request(v_staff,v_store,v_date+3,'available','16:00','12:00','invalid'); exception when others then failed:=true; end;
+ if not failed then raise exception 'invalid range accepted'; end if;
+ if has_function_privilege('anon','public.save_roster_shift_request(bigint,bigint,date,text,time,time,text)','EXECUTE') or has_function_privilege('authenticated','public.review_roster_shift_request(bigint,integer,boolean,uuid)','EXECUTE') or has_table_privilege('authenticated','public.roster_shift_requests','SELECT') then raise exception 'private data permissions too broad'; end if;
+end;
+$test$;
+select 'PASS: save, approval, authorization, revision, duplicate, approved edit, cross-store overlap, resubmit, rest, invalid time, permissions; test data rolled back' as result;
+rollback;

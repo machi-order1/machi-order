@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
+import { managerRequests, staffRequests } from "./requests.ts";
 
 const H = {
   "Access-Control-Allow-Origin": "*",
@@ -6,6 +7,7 @@ const H = {
     "authorization,content-type,apikey,x-kiosk-token",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
   "Content-Type": "application/json; charset=utf-8",
+  "Cache-Control": "no-store",
 };
 const out = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: H });
@@ -149,6 +151,10 @@ Deno.serve(async (req: Request) => {
     if (req.method !== "POST") return out({ error: "未対応の操作です" }, 405);
     const b = await req.json(),
       action = String(b.action || "");
+    if (["request_list", "request_review"].includes(action)) {
+      if (!manager) return out({ error: "店長ログインが必要です" }, 401);
+      return await managerRequests(sb, b, manager.user.id);
+    }
 
     if (["device_register", "device_revoke", "pin_set"].includes(action)) {
       if (!manager) return out({ error: "店長ログインが必要です" }, 401);
@@ -171,17 +177,15 @@ Deno.serve(async (req: Request) => {
             .select("id,store_id,device_name")
             .single();
         if (error) throw error;
-        await sb
-          .from("audit_logs")
-          .insert({
-            company_id: companyId,
-            store_id: storeId,
-            user_id: manager.user.id,
-            action: "attendance_kiosk_register",
-            entity_type: "attendance_kiosk_device",
-            entity_id: data.id,
-            details: { device_name: name },
-          });
+        await sb.from("audit_logs").insert({
+          company_id: companyId,
+          store_id: storeId,
+          user_id: manager.user.id,
+          action: "attendance_kiosk_register",
+          entity_type: "attendance_kiosk_device",
+          entity_id: data.id,
+          details: { device_name: name },
+        });
         return out({ ok: true, device: data, kiosk_token: raw });
       }
       if (action === "device_revoke") {
@@ -214,16 +218,14 @@ Deno.serve(async (req: Request) => {
         p_updated_by: manager.user.id,
       });
       if (error) throw error;
-      await sb
-        .from("audit_logs")
-        .insert({
-          company_id: companyId,
-          user_id: manager.user.id,
-          action: "staff_kiosk_pin_set",
-          entity_type: "staff_roster",
-          entity_id: String(staffId),
-          details: { display_name: person.display_name },
-        });
+      await sb.from("audit_logs").insert({
+        company_id: companyId,
+        user_id: manager.user.id,
+        action: "staff_kiosk_pin_set",
+        entity_type: "staff_roster",
+        entity_id: String(staffId),
+        details: { display_name: person.display_name },
+      });
       return out({ ok: true });
     }
 
@@ -249,6 +251,8 @@ Deno.serve(async (req: Request) => {
       .single();
     const storeId = device.store_id,
       today = day();
+    if (["request_save", "my_requests"].includes(action))
+      return await staffRequests(sb, b, staffId, storeId, today);
     const { data: working } = await sb
       .from("work_shifts")
       .select("*")
