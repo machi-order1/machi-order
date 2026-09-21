@@ -3,17 +3,46 @@
  const isKitchen=location.pathname==='/kitchen.html'||location.pathname==='/kitchen';
  const isCashier=location.pathname==='/cashier.html'||location.pathname==='/cashier';
  const params=new URLSearchParams(location.search),storeKey=isKitchen?params.get('store'):null;
- const storeId=storeKey==='shirakibaru'?2:Number(params.get('store_id')||1);
+ const requestedStoreId=storeKey==='shirakibaru'?2:Number(params.get('store_id')||localStorage.getItem('machi_store_id')||1);
+ const storeId=[1,2].includes(requestedStoreId)?requestedStoreId:1;
+ localStorage.setItem('machi_store_id',String(storeId));
+ window.MACHI_STORE_ID=storeId;
+ const nativeFetch=window.fetch.bind(window);
+ const authUrl='https://tejglrlkaqolbghoagqj.supabase.co/auth/v1/token?grant_type=refresh_token';
+ const publishableKey='sb_publishable_beZla85Y6Ngrx0hji9I9rg_FbcRSUoT';
+ let refreshPromise=null;
+ const refreshSession=()=>{
+  if(refreshPromise)return refreshPromise;
+  const refreshToken=localStorage.getItem('machi_refresh_token')||'';
+  if(!refreshToken)return Promise.resolve('');
+  refreshPromise=nativeFetch(authUrl,{method:'POST',headers:{apikey:publishableKey,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refreshToken})}).then(async response=>{
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok||!data.access_token){['machi_access_token','mo_staff_token','access_token','sb_access_token','machi_refresh_token','machi_token_expires_at'].forEach(key=>localStorage.removeItem(key));return''}
+   localStorage.setItem('machi_access_token',data.access_token);localStorage.setItem('mo_staff_token',data.access_token);
+   if(data.refresh_token)localStorage.setItem('machi_refresh_token',data.refresh_token);
+   localStorage.setItem('machi_token_expires_at',String(Date.now()+Math.max(60,Number(data.expires_in)||3600)*1000));
+   return data.access_token;
+  }).catch(()=>'').finally(()=>{refreshPromise=null});
+  return refreshPromise;
+ };
+ window.fetch=async(input,init)=>{
+  const raw=typeof input==='string'?input:input?.url||'';
+  if(storeId===2&&raw.includes('/functions/v1/')&&raw.includes('store_id=1')){
+   const changed=raw.replace(/([?&])store_id=1(?=&|$)/,'$1store_id=2');
+   input=typeof input==='string'?changed:new Request(changed,input);
+  }
+  const retryInput=input instanceof Request?input.clone():input;
+  const response=await nativeFetch(input,init);
+  if(response.status!==401||raw.includes('/auth/v1/token'))return response;
+  const accessToken=await refreshSession();
+  if(!accessToken)return response;
+  const retryHeaders=new Headers(input instanceof Request?input.headers:init?.headers||{});retryHeaders.set('Authorization','Bearer '+accessToken);
+  return nativeFetch(retryInput,{...init,headers:retryHeaders});
+ };
+ const storePages=new Set(['manager.html','store-command.html','product-admin.html','opening-check.html','closing.html','today.html','operation-log.html','system-check.html','inventory.html','prep.html','hygiene.html','cashier.html','kitchen.html','staff-order.html','staff.html','time-clock.html','my-shifts.html','shift-request.html','shift-builder.html','shift-collection.html','emergency-cover.html','notifications.html','labor-dashboard.html','daily-profit.html','cost-editor.html','staff-meal.html','point-approval.html','reminder-settings.html','takeout-settings.html']);
+ const propagateStoreLinks=()=>document.querySelectorAll('a[href]').forEach(link=>{try{const url=new URL(link.getAttribute('href'),location.href),page=url.pathname.split('/').pop();if(url.origin===location.origin&&storePages.has(page)){url.searchParams.set('store_id',String(storeId));link.href=url.pathname+url.search+url.hash}}catch{}});
+ document.addEventListener('DOMContentLoaded',()=>setTimeout(propagateStoreLinks,0));
  if(storeId===2&&(isKitchen||isCashier)){
-  const nativeFetch=window.fetch.bind(window);
-  window.fetch=(input,init)=>{
-   const raw=typeof input==='string'?input:input?.url||'';
-   if(raw.includes('/functions/v1/kitchen-api?store_id=1')||raw.includes('/functions/v1/cashier-api?store_id=1')){
-    const changed=raw.replace('store_id=1','store_id=2');
-    input=typeof input==='string'?changed:new Request(changed,input);
-   }
-   return nativeFetch(input,init);
-  };
   const manifest=document.querySelector('link[rel="manifest"]');
   if(manifest)manifest.href='/kitchen-shirakibaru.webmanifest';
   document.title=isKitchen?'白木原店 厨房｜MACHI ORDER':'白木原店 会計｜MACHI ORDER';
