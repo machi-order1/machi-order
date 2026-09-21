@@ -97,6 +97,11 @@
       return found;
     }
     function optionDelta() { return optionDetails(Object.values(selected).flat()).reduce((sum, item) => sum + Number(item.price_delta || 0), 0); }
+    function orderingMessage() {
+      if (data?.ordering?.enabled === false) return '現在、注文受付を一時停止しています。スタッフへお声がけください。';
+      if (data?.ordering?.is_open === false) return '現在は営業時間外です。メニューはご覧いただけます。';
+      return '';
+    }
 
     async function load() {
       if (!seatToken) throw new Error('席のQRコードから開いてください。');
@@ -115,7 +120,9 @@
       const happyProduct = (data.products || []).find((product) => product.price_type === 'happy_hour');
       const happyEnd = happyProduct?.price_rule_end_time ? happyProduct.price_rule_end_time.slice(0, 5) : '';
       const happyBanner = happyProduct ? `<div class="happy-banner"><div><strong>🔥 ハッピーアワー開催中！</strong><span>アルコールがお得な期間限定価格</span></div><b>${Machi.escapeHtml(happyEnd || '終了時刻まで')}</b></div>` : '';
-      $('menu').innerHTML = happyBanner + displayCategories().map((category) => {
+      const stopped = orderingMessage();
+      const orderingNotice = stopped ? `<div class="notice danger"><b>${data.ordering?.enabled === false ? 'ただいま注文受付を停止中です' : 'ただいま営業時間外です'}</b><br>${Machi.escapeHtml(stopped)}</div>` : '';
+      $('menu').innerHTML = orderingNotice + happyBanner + displayCategories().map((category) => {
         const ids = (data.categories || []).filter((item) => Number(item.id) === Number(category.id) || Number(item.parent_id) === Number(category.id)).map((item) => Number(item.id));
         const products = (data.products || []).filter((product) => ids.includes(Number(product.category_id)));
         return `<section id="c${Number(category.id)}"><h2>${Machi.escapeHtml(category.name)}</h2>${products.map(productCard).join('')}</section>`;
@@ -204,7 +211,8 @@
     function showCart() {
       const total = cart.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet"><h2>ご注文内容</h2>${cart.map((item, index) => `<div class="card row"><div><b>${Machi.escapeHtml(item.name)}</b>${item.option_names?.length ? `<div class="desc">${item.option_names.map(Machi.escapeHtml).join(' / ')}</div>` : ''}<div>${item.quantity}点 × ${Machi.yen(item.price)}</div><div class="qtyrow"><button class="mini" data-cart-qty="${index}:-1">−</button><b>${item.quantity}</b><button class="mini" data-cart-qty="${index}:1">＋</button></div></div><button class="mini" data-remove="${index}">削除</button></div>`).join('')}<h2>合計 ${Machi.yen(total)}</h2><button id="send-order" class="order">この内容で注文する</button><button id="close-modal" class="choice">戻る</button></div>`;
+      const stopped = orderingMessage();
+      $('modal').innerHTML = `<div class="sheet"><h2>ご注文内容</h2>${cart.map((item, index) => `<div class="card row"><div><b>${Machi.escapeHtml(item.name)}</b>${item.option_names?.length ? `<div class="desc">${item.option_names.map(Machi.escapeHtml).join(' / ')}</div>` : ''}<div>${item.quantity}点 × ${Machi.yen(item.price)}</div><div class="qtyrow"><button class="mini" data-cart-qty="${index}:-1">−</button><b>${item.quantity}</b><button class="mini" data-cart-qty="${index}:1">＋</button></div></div><button class="mini" data-remove="${index}">削除</button></div>`).join('')}<h2>合計 ${Machi.yen(total)}</h2>${stopped ? `<div class="notice danger">${Machi.escapeHtml(stopped)}</div>` : ''}<button id="send-order" class="order" ${stopped ? 'disabled' : ''}>${stopped ? '現在は注文できません' : 'この内容で注文する'}</button><button id="close-modal" class="choice">戻る</button></div>`;
       document.querySelectorAll('[data-cart-qty]').forEach((button) => button.onclick = () => { const [index, delta] = button.dataset.cartQty.split(':').map(Number); cart[index].quantity = Math.max(0, Number(cart[index].quantity) + delta); if (!cart[index].quantity) cart.splice(index, 1); saveCart(); updateCart(); showCart(); });
       document.querySelectorAll('[data-remove]').forEach((button) => button.onclick = () => { cart.splice(Number(button.dataset.remove), 1); saveCart(); updateCart(); showCart(); });
       $('send-order').onclick = order;
@@ -213,6 +221,7 @@
 
     async function order() {
       if (!cart.length || sending) return;
+      if (orderingMessage()) return alert(orderingMessage());
       if (testMode) return showSuccess({ test: true });
       if (!navigator.onLine) return alert('オフラインです。通信が戻ってから注文してください。');
       if (localStorage.getItem(pendingKey)) return showPendingWarning(true);

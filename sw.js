@@ -1,4 +1,4 @@
-const C='machi-order-v71-13';
+const C='machi-order-v71-14';
 const A=[
   '/index.html','/login.html','/reset-password.html','/order-entry.html','/staff-order.html','/launchpad.html','/store-command.html','/product-admin.html','/opening-check.html','/website-inquiries.html','/kitchen.html','/cashier.html','/today.html','/staff.html',
   '/machi-app.js','/machi-design-system.css','/machi-ui-config.js','/manifest.webmanifest',

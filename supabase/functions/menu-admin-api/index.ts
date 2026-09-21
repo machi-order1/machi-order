@@ -46,11 +46,15 @@ Deno.serve(async (req: Request) => {
       if (rulesError) throw rulesError
       const { count: activeTableCount, error: tableError } = await sb.from('dining_tables').select('id', { count: 'exact', head: true }).eq('store_id', storeId).eq('active', true)
       if (tableError) throw tableError
+      const { data: settings, error: settingsError } = await sb.from('store_settings').select('ordering_enabled').eq('store_id', storeId).maybeSingle()
+      if (settingsError) throw settingsError
       const statusMap = new Map((statuses || []).map((s: any) => [Number(s.product_id), s]))
       return json({
         store: { id: store.id, name: store.name },
         role: membership.role,
         can_edit_happy_hour: managerRoles.has(membership.role),
+        can_manage_ordering: managerRoles.has(membership.role),
+        ordering_enabled: settings?.ordering_enabled !== false,
         diagnostics: {
           active_table_count: activeTableCount || 0,
           active_product_count: (products || []).length,
@@ -93,6 +97,13 @@ Deno.serve(async (req: Request) => {
         if (error) throw error
       }
       return json({ ok: true, start_time: startTime, end_time: endTime, active })
+    }
+    if (action === 'set_ordering_enabled') {
+      if (!managerRoles.has(membership.role)) return json({ error: '注文受付の変更は店長のみ行えます' }, 403)
+      if (typeof body.enabled !== 'boolean') return json({ error: '注文受付の状態が正しくありません' }, 400)
+      const { error } = await sb.from('store_settings').upsert({ store_id: storeId, ordering_enabled: body.enabled, updated_at: new Date().toISOString() }, { onConflict: 'store_id' })
+      if (error) throw error
+      return json({ ok: true, ordering_enabled: body.enabled })
     }
     return json({ error: '操作が正しくありません' }, 400)
   } catch (error) {
