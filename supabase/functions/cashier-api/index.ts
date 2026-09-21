@@ -7,7 +7,7 @@ const headers = {
   'Content-Type': 'application/json; charset=utf-8',
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers })
-const orderSelect = 'id,status,total,ordered_at,paid_at,payment_status,payment_method,receipt_number,dining_tables(name),order_items(product_name_snapshot,quantity,line_total,order_item_options(option_name_snapshot,price_delta))'
+const orderSelect = 'id,status,total,ordered_at,paid_at,payment_status,payment_method,receipt_number,customer_note,order_channel_code,dining_tables(name),takeout_order_details(customer_name,phone,pickup_at,pickup_status),order_items(product_name_snapshot,quantity,line_total,order_item_options(option_name_snapshot,price_delta))'
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers })
