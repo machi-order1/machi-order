@@ -1,6 +1,6 @@
-const C='machi-order-v71-18';
+const C='machi-order-v71-19';
 const A=[
-  '/index.html','/login.html','/reset-password.html','/order-entry.html','/staff-order.html','/launchpad.html','/store-command.html','/product-admin.html','/opening-check.html','/operation-log.html','/website-inquiries.html','/takeout.html','/takeout-settings.html','/kitchen.html','/cashier.html','/today.html','/staff.html','/time-clock.html','/my-shifts.html','/shift-request.html',
+  '/index.html','/login.html','/reset-password.html','/order-entry.html','/staff-order.html','/launchpad.html','/store-command.html','/product-admin.html','/opening-check.html','/closing.html','/inventory.html','/operation-log.html','/system-check.html','/offline.html','/website-inquiries.html','/takeout-settings.html','/kitchen.html','/cashier.html','/today.html','/staff.html','/time-clock.html','/my-shifts.html','/shift-request.html',
   '/machi-app.js','/machi-design-system.css','/machi-ui-config.js','/manifest.webmanifest',
   '/assets/brand/151-logo-white.webp',
   '/assets/menu-items/web/hakata-aburasoba.webp','/assets/menu-items/web/ebi-shio-aburasoba.webp','/assets/menu-items/web/iki-beef-hakata.webp','/assets/menu-items/web/iki-beef-ebi-shio.webp',
@@ -23,5 +23,10 @@ self.addEventListener('fetch',event=>{
     const copy=response.clone();
     caches.open(C).then(cache=>cache.put(event.request,copy));
     return response;
-  }).catch(()=>caches.match(event.request)));
+  }).catch(async()=>{
+    const cached=await caches.match(event.request);
+    if(cached)return cached;
+    if(event.request.mode==='navigate')return caches.match('/offline.html');
+    return new Response('',{status:503,statusText:'Offline'});
+  }));
 });

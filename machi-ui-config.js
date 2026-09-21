@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded',()=>{
  open.className='tile';open.href='/opening-check.html';
  open.innerHTML='<div class="ico">✅</div><b>営業前チェック</b><span>QR・厨房・会計・通知音</span>';
  grid.insertBefore(open,inventory);
+ const system=document.createElement('a');
+ system.className='tile';system.href='/system-check.html';
+ system.innerHTML='<div class="ico">🛟</div><b>システム確認</b><span>通信・ログイン・復旧</span>';
+ grid.appendChild(system);
 });
 
 document.addEventListener('DOMContentLoaded',()=>{

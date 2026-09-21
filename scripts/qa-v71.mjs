@@ -4,7 +4,7 @@ const checks = [];
 const source = async (file) => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
 const expect = (name, ok) => checks.push({ name, ok: Boolean(ok) });
 
-const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, operationsApi, worker, menu, kitchen, productAdmin, menuAdminApi, menuApi, kitchenApi, orderingGuard, timeClock, myShifts, workforceApi, uiConfig, takeout, takeoutApi] = await Promise.all([
+const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, operationsApi, worker, menu, kitchen, productAdmin, menuAdminApi, menuApi, kitchenApi, orderingGuard, timeClock, myShifts, workforceApi, uiConfig, closing, closingApi, inventory, inventoryApi, systemCheck, offline] = await Promise.all([
   source('cashier.html'),
   source('supabase/functions/cashier-api/index.ts'),
   source('supabase/migrations/20260921_cashier_payment_undo.sql'),
@@ -25,8 +25,12 @@ const [cashier, cashierApi, paymentUndo, reset, login, opening, operationLog, op
   source('my-shifts.html'),
   source('supabase/functions/workforce-api/index.ts'),
   source('machi-ui-config.js'),
-  source('takeout.html'),
-  source('supabase/functions/takeout-api/index.ts'),
+  source('closing.html'),
+  source('supabase/functions/closing-api/index.ts'),
+  source('inventory.html'),
+  source('supabase/functions/inventory-api/index.ts'),
+  source('system-check.html'),
+  source('offline.html'),
 ]);
 
 expect('現金受取を明示してから会計完了', cashier.includes('現金を受け取りました'));
@@ -49,7 +53,7 @@ expect('営業前チェック完了を担当者付きで記録', opening.include
 expect('操作履歴は店長権限だけ閲覧可能', operationLog.includes('operations-api') && operationsApi.includes('managerRoles'));
 expect('商品・受付・会計の重要操作を監査記録', menuAdminApi.includes('sale_status_changed') && menuAdminApi.includes('ordering_changed') && cashierApi.includes('payment_completed') && cashierApi.includes('payment_reverted'));
 expect('売切・停止を1タップで絞込', productAdmin.includes('quickfilters') && productAdmin.includes('data-status="sold_out"'));
-expect('更新キャッシュ番号', worker.includes("machi-order-v71-18"));
+expect('更新キャッシュ番号', worker.includes("machi-order-v71-19"));
 expect('営業時間外・受付停止を注文前に表示', menu.includes('orderingMessage') && menu.includes('現在は注文できません'));
 expect('店長が注文受付を一時停止・再開できる', productAdmin.includes('set_ordering_enabled') && productAdmin.includes('注文受付を停止中'));
 expect('注文受付停止をAPI側でも返す', menuApi.includes('注文受付を一時停止しています'));
@@ -64,13 +68,24 @@ expect('勤怠APIは二重打刻と休憩中退勤を防止', workforceApi.inclu
 expect('シフト日付検証は数字を正しく受け付ける', workforceApi.includes('/^\\d{4}-\\d{2}-\\d{2}$/') && !workforceApi.includes('/^\\\\d{4}'));
 expect('マイシフトは手入力トークンを廃止', myShifts.includes('machi_access_token') && !myShifts.includes('ログイントークン'));
 expect('スタッフ画面から勤怠打刻へ移動', uiConfig.includes("link.href='/time-clock.html'"));
-expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-18") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
-expect('公開テイクアウト注文画面をキャッシュ対象に追加', worker.includes("'/takeout.html'"));
-expect('テイクアウト再送は同じ注文IDを再利用', takeout.includes('machi_takeout_pending') && takeout.includes('pending.signature!==signature'));
-expect('受取時刻は店舗設定の最短・最長を反映', takeout.includes('min_lead_minutes') && takeout.includes('max_advance_minutes') && takeout.includes('min="${min}"') && takeout.includes('max="${max}"'));
-expect('厨房にテイクアウト受取情報を表示', kitchenApi.includes('takeout_order_details(customer_name,phone,pickup_at,pickup_status)') && kitchen.includes('takeout-meta'));
-expect('会計にテイクアウト受取情報を表示・検索', cashierApi.includes('takeout_order_details(customer_name,phone,pickup_at,pickup_status)') && cashier.includes('takeoutMeta') && cashier.includes('info?.phone'));
-expect('テイクアウトAPIは注文IDで冪等処理', takeoutApi.includes('requestId') && takeoutApi.includes('place_takeout_order_idempotent'));
+expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-19") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
+expect('日次締めは保存済みログインを使用', closing.includes('machi_access_token') && !closing.includes('アクセストークン'));
+expect('閉店チェック完了前は締め不可', closing.includes('checksDone()') && closing.includes('data-close-check'));
+expect('現金差額ありは理由入力が必須', closingApi.includes('現金差額があるため') && closingApi.includes('!note'));
+expect('日次締めの二重記録を防止', closingApi.includes('二重締めはできません') && closingApi.includes(".insert(row)"));
+expect('日次締めを監査記録', closingApi.includes("action: 'daily_closing_completed'"));
+expect('引継ぎ保存APIを実装', operationsApi.includes("body.action !== 'handoff'") && operationsApi.includes("from('store_handoffs')"));
+expect('在庫画面は未棚卸と発注候補を区別', inventory.includes('data-filter="unknown"') && inventory.includes('data-filter="reorder"'));
+expect('棚卸入力は確認してから保存', inventory.includes('で記録しますか？') && inventory.includes("action:'count'"));
+expect('棚卸日時と数量をAPI側で検証', inventoryApi.includes('棚卸日時が正しくありません') && inventoryApi.includes('quantity < 0'));
+expect('棚卸を監査記録', inventoryApi.includes("action: 'inventory_count_recorded'"));
+expect('締め・在庫をオフラインキャッシュ対象に追加', worker.includes("'/closing.html'") && worker.includes("'/inventory.html'"));
+expect('通信断時は専用オフライン画面へ退避', worker.includes("caches.match('/offline.html')") && offline.includes('通信の回復を待っています'));
+expect('システム確認は主要4APIを読み取り診断', systemCheck.includes("probe('menu-admin-api'") && systemCheck.includes("probe('kitchen-api'") && systemCheck.includes("probe('cashier-api'") && systemCheck.includes("probe('closing-api'"));
+expect('システム確認は注文・売上・在庫を変更しないと明示', systemCheck.includes('注文・売上・在庫・商品設定は変更しません'));
+expect('システム確認は日本時間の営業日を表示', systemCheck.includes("timeZone:'Asia/Tokyo'") && systemCheck.includes('営業日'));
+expect('店舗ホームからシステム確認へ移動', uiConfig.includes("system.href='/system-check.html'"));
+expect('システム確認とオフライン画面をキャッシュ', worker.includes("'/system-check.html'") && worker.includes("'/offline.html'"));
 
 for (const check of checks) console.log(`${check.ok ? 'PASS' : 'FAIL'}  ${check.name}`);
 if (checks.some((check) => !check.ok)) process.exitCode = 1;
