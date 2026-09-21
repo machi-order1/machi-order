@@ -1,5 +1,5 @@
 -- Prepare Shirakibaru as an isolated second store.
--- Ordering, channels, and products remain disabled until final menu review.
+-- Product availability mirrors Nagahama, while ordering and channels remain disabled.
 do $$
 declare
   v_store_id bigint;
@@ -37,10 +37,27 @@ begin
       (v_store_id, '夜営業', '17:00', '22:00', 2);
   end if;
 
-  if not exists (select 1 from public.dining_tables where store_id = v_store_id) then
+  -- Before the store starts taking orders, keep its physical seating definition exact:
+  -- 7 counter seats + two 4-person tables = 15 seats.
+  if not exists (select 1 from public.orders where store_id = v_store_id) then
+    delete from public.dining_tables where store_id = v_store_id;
+
     insert into public.dining_tables (store_id, name, table_number, seat_code, capacity, seat_type)
-    select v_store_id, '席' || lpad(n::text, 2, '0'), n, lpad(n::text, 2, '0'), 1, 'table'
-    from generate_series(1, 16) as n;
+    select
+      v_store_id,
+      'カウンター' || lpad(n::text, 2, '0'),
+      n,
+      'C' || lpad(n::text, 2, '0'),
+      1,
+      'counter'
+    from generate_series(1, 7) as n;
+
+    insert into public.dining_tables (
+      store_id, name, table_number, seat_code, capacity, seat_type
+    )
+    values
+      (v_store_id, '4人テーブル01', 8, 'T01', 4, 'table'),
+      (v_store_id, '4人テーブル02', 9, 'T02', 4, 'table');
 
     insert into public.dining_tables (store_id, name, capacity, seat_type)
     values (v_store_id, 'テイクアウト受付', 1, 'other');
@@ -54,10 +71,11 @@ begin
   set role = 'manager', active = true;
 
   insert into public.store_products (store_id, product_id, sale_status)
-  select v_store_id, product_id, 'stopped'
+  select v_store_id, product_id, sale_status
   from public.store_products
   where store_id = 1
-  on conflict (store_id, product_id) do nothing;
+  on conflict (store_id, product_id) do update
+  set sale_status = excluded.sale_status, updated_at = now();
 
   insert into public.store_channel_settings (
     store_id, channel_code, enabled, external_store_ref, notes,
