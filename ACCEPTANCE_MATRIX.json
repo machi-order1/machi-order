@@ -8,8 +8,8 @@
     "blocker": "authenticated E2E"
   },
   "cashier": {
-    "status": "ui_ready",
-    "blocker": "atomic payment hardening"
+    "status": "ready_for_authenticated_e2e",
+    "blocker": "authenticated E2E on store device"
   },
   "attendance": {
     "status": "ui_ready",
