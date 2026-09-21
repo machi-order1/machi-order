@@ -2,8 +2,8 @@
 (function(){
  const isKitchen=location.pathname==='/kitchen.html'||location.pathname==='/kitchen';
  const isCashier=location.pathname==='/cashier.html'||location.pathname==='/cashier';
- const storeKey=isKitchen?new URLSearchParams(location.search).get('store'):null;
- const storeId=storeKey==='shirakibaru'?2:Number(new URLSearchParams(location.search).get('store_id')||1);
+ const params=new URLSearchParams(location.search),storeKey=isKitchen?params.get('store'):null;
+ const storeId=storeKey==='shirakibaru'?2:Number(params.get('store_id')||1);
  if(storeId===2&&(isKitchen||isCashier)){
   const nativeFetch=window.fetch.bind(window);
   window.fetch=(input,init)=>{
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 document.addEventListener('DOMContentLoaded',()=>{
  const isKitchen=location.pathname==='/kitchen.html'||location.pathname==='/kitchen';
  if(!isKitchen)return;
- const white=new URLSearchParams(location.search).get('store')==='shirakibaru',head=document.querySelector('.headside');
+ const kitchenParams=new URLSearchParams(location.search),white=kitchenParams.get('store')==='shirakibaru'||kitchenParams.get('store_id')==='2',head=document.querySelector('.headside');
  if(!head||head.querySelector('.oral-order-link'))return;
  const link=document.createElement('a');link.className='device-test oral-order-link';
  link.style.textDecoration='none';link.href='/staff-order.html?store_id='+(white?'2':'1');link.textContent='＋ 口頭注文';
