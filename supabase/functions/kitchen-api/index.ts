@@ -23,14 +23,14 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === 'GET') {
       const { data, error } = await sb.from('orders')
-        .select('id,status,total,ordered_at,customer_note,order_channel_code,external_order_ref,dining_tables(name,table_number,seat_code,seat_type),takeout_order_details(customer_name,phone,pickup_at,pickup_status),order_items(id,product_name_snapshot,quantity,unit_price,customer_note,order_item_options(option_name_snapshot,price_delta))')
+        .select('id,status,total,ordered_at,customer_note,entry_channel,order_channel_code,external_order_ref,dining_tables(name,table_number,seat_code,seat_type),takeout_order_details(customer_name,phone,pickup_at,pickup_status),order_items(id,product_name_snapshot,quantity,unit_price,customer_note,order_item_options(option_name_snapshot,price_delta))')
         .eq('store_id', storeId).in('status', ['new', 'cooking']).order('ordered_at', { ascending: true })
       if (error) throw error
       return json({ role: membership.role, orders: data || [] })
     }
 
     if (req.method === 'PATCH') {
-      if (!['manager', 'kitchen', 'staff'].includes(membership.role)) return json({ error: '注文状態を変更する権限がありません' }, 403)
+      if (!['owner', 'admin', 'manager', 'kitchen', 'staff'].includes(membership.role)) return json({ error: '注文状態を変更する権限がありません' }, 403)
       const body = await req.json().catch(() => ({})), orderId = Number(body.order_id), next = String(body.status || ''), undo = body.undo === true
       if (!orderId || !['cooking', 'served'].includes(next)) return json({ error: '注文番号または状態が正しくありません' }, 400)
       const { data: order } = await sb.from('orders').select('status,served_at').eq('id', orderId).eq('store_id', storeId).maybeSingle()
