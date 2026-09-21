@@ -64,6 +64,18 @@ Deno.serve(async (req: Request) => {
       if (error) throw error
       return json({ tasks: tasks || [], business_date: businessDate, role: membership.role })
     }
+    if (parsed.searchParams.get('mode') === 'summary') {
+      if (!managerRoles.has(membership.role)) return json({ error: '店長権限が必要です' }, 403)
+      const businessDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date())
+      const [{ data: taskRows, error: taskError }, { data: handoffs, error: handoffError }, { data: hygiene, error: hygieneError }] = await Promise.all([
+        sb.from('store_tasks').select('id,title,status,priority,due_at').eq('store_id', storeId).eq('business_date', businessDate),
+        sb.from('store_handoffs').select('id,message,priority,created_at').eq('store_id', storeId).is('resolved_at', null).order('created_at', { ascending: false }).limit(50),
+        sb.from('hygiene_checks').select('id,session,passed,checked_at').eq('store_id', storeId).eq('business_date', businessDate),
+      ])
+      if (taskError || handoffError || hygieneError) throw taskError || handoffError || hygieneError
+      const tasks = (taskRows || []).filter((task: any) => !['done', 'completed'].includes(task.status))
+      return json({ business_date: businessDate, tasks, handoffs: handoffs || [], hygiene: hygiene || [], role: membership.role })
+    }
     if (!managerRoles.has(membership.role)) return json({ error: '操作履歴は店長のみ確認できます' }, 403)
 
     const { data: logs, error } = await sb.from('audit_logs')
