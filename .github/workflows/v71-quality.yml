@@ -1,0 +1,29 @@
+name: V71 quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v71-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: node --check machi-app.js && node --check machi-ui-config.js && node --check sw.js
+      - name: Audit store routing
+        run: node scripts/audit-store-routing.mjs
+      - name: Run V71 regression checks
+        run: node scripts/qa-v71.mjs
