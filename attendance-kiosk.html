@@ -160,7 +160,7 @@
       <section class="card setup hide" id="setup">
         <h2>この端末を登録</h2>
         <p class="muted">
-          初回だけ店長ログインが必要です。登録後はスタッフが暗証番号で打刻できます。
+          初回だけ店長ログインが必要です。登録後はこの端末の店長ログインを解除し、スタッフが暗証番号で打刻できます。
         </p>
         <div class="field">
           <label>店舗</label
@@ -184,6 +184,7 @@
           ><input
             class="pin"
             id="pin"
+            type="password"
             inputmode="numeric"
             pattern="[0-9]*"
             maxlength="8"
@@ -203,8 +204,47 @@
         ><button class="btn outline" id="break-start">休憩を開始</button
         ><button class="btn red" id="break-end">休憩を終了</button
         ><button class="btn" id="clock-out">退勤する</button
-        ><button class="btn outline" id="lock">終了して名前選択へ</button>
+        ><button class="btn outline" id="requests-open">
+          シフト希望・確定予定
+        </button>
+        <button class="btn outline" id="lock">終了して名前選択へ</button>
       </div>
+      <section class="card hide" id="requests">
+        <h2>シフト希望</h2>
+        <p class="muted">
+          この端末の店舗への希望です。1日1つの時間帯を登録できます。店長の確認後に確定します。
+        </p>
+        <div class="field">
+          <label for="request-date">希望日</label
+          ><input id="request-date" type="date" />
+        </div>
+        <div class="field">
+          <label for="preference">希望</label
+          ><select id="preference">
+            <option value="available">勤務できます</option>
+            <option value="unavailable">休み希望</option>
+          </select>
+        </div>
+        <div id="request-times">
+          <div class="field">
+            <label for="request-start">開始</label
+            ><input id="request-start" type="time" value="11:00" />
+          </div>
+          <div class="field">
+            <label for="request-end">終了</label
+            ><input id="request-end" type="time" value="15:00" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="request-note">連絡事項（任意）</label
+          ><input id="request-note" maxlength="300" />
+        </div>
+        <button class="btn red" id="request-save">希望を送信</button>
+        <h3>提出済みの希望</h3>
+        <div id="request-list"></div>
+        <h3>確定シフト（両店舗）</h3>
+        <div id="confirmed-list"></div>
+      </section>
       <div class="msg" id="msg" role="alert"></div>
     </main>
     <script>
@@ -284,6 +324,11 @@
           setMsg("");
         }
         function showRoster() {
+          $("#pin").value = "";
+          $("#requests").classList.add("hide");
+          $("#request-list").textContent = "";
+          $("#confirmed-list").textContent = "";
+          $("#request-note").value = "";
           selected = null;
           pin = "";
           snapshot = null;
@@ -417,6 +462,15 @@
               true,
             );
             localStorage.machi_kiosk_token = j.kiosk_token;
+            for (const key of [
+              "machi_access_token",
+              "mo_staff_token",
+              "access_token",
+              "sb_access_token",
+              "machi_refresh_token",
+              "machi_token_expires_at",
+            ])
+              localStorage.removeItem(key);
             location.reload();
           } catch (e) {
             setMsg(e.message);
@@ -451,6 +505,105 @@
         $("#break-end").onclick = () => act("break_end");
         $("#clock-out").onclick = () => act("clock_out");
         $("#lock").onclick = showRoster;
+        function touchSession() {
+          if (!selected || !pin) return;
+          clearTimeout(lockTimer);
+          lockTimer = setTimeout(showRoster, 60000);
+        }
+        async function loadRequests() {
+          if (!selected) return;
+          const id = selected.id;
+          const j = await api("POST", {
+            action: "my_requests",
+            staff_id: id,
+            pin,
+          });
+          if (!selected || selected.id !== id) return;
+          $("#request-list").innerHTML =
+            j.requests
+              .map(
+                (x) =>
+                  "<p><b>" +
+                  esc(x.work_date) +
+                  "</b> " +
+                  (x.preference === "unavailable"
+                    ? "休み希望"
+                    : esc(
+                        x.start_time.slice(0, 5) +
+                          "〜" +
+                          x.end_time.slice(0, 5),
+                      )) +
+                  "<br>" +
+                  { pending: "確認待ち", approved: "確定", declined: "見送り" }[
+                    x.status
+                  ] +
+                  "</p>",
+              )
+              .join("") || "まだ提出していません";
+          $("#confirmed-list").innerHTML =
+            j.shifts
+              .map(
+                (x) =>
+                  "<p><b>" +
+                  esc(x.shift_date) +
+                  "</b> " +
+                  esc(x.stores?.name || "") +
+                  "<br>" +
+                  esc(
+                    (x.scheduled_start || "").slice(0, 5) +
+                      "〜" +
+                      (x.scheduled_end || "").slice(0, 5),
+                  ) +
+                  "</p>",
+              )
+              .join("") || "確定シフトはありません";
+        }
+        $("#requests-open").onclick = async () => {
+          $("#requests").classList.remove("hide");
+          const today = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Tokyo",
+          }).format(new Date());
+          $("#request-date").min = today;
+          $("#request-date").value = today;
+          touchSession();
+          try {
+            await loadRequests();
+          } catch (e) {
+            setMsg(e.message);
+          }
+        };
+        $("#requests").addEventListener("input", touchSession);
+        $("#preference").onchange = () =>
+          $("#request-times").classList.toggle(
+            "hide",
+            $("#preference").value === "unavailable",
+          );
+        $("#request-save").onclick = async () => {
+          if (!selected || busy) return;
+          busy = true;
+          $("#request-save").disabled = true;
+          clearTimeout(lockTimer);
+          try {
+            await api("POST", {
+              action: "request_save",
+              staff_id: selected.id,
+              pin,
+              work_date: $("#request-date").value,
+              preference: $("#preference").value,
+              start_time: $("#request-start").value,
+              end_time: $("#request-end").value,
+              note: $("#request-note").value,
+            });
+            setMsg("希望を送信しました。店長の確認をお待ちください", true);
+            await loadRequests();
+          } catch (e) {
+            setMsg(e.message);
+          } finally {
+            busy = false;
+            $("#request-save").disabled = false;
+            touchSession();
+          }
+        };
         $("#register").onclick = register;
         setInterval(tick, 1000);
         tick();
