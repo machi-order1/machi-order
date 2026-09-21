@@ -61,7 +61,7 @@ expect('営業前チェック完了を担当者付きで記録', opening.include
 expect('操作履歴は店長権限だけ閲覧可能', operationLog.includes('operations-api') && operationsApi.includes('managerRoles'));
 expect('商品・受付・会計の重要操作を監査記録', menuAdminApi.includes('sale_status_changed') && menuAdminApi.includes('ordering_changed') && cashierApi.includes('payment_completed') && cashierApi.includes('payment_reverted'));
 expect('売切・停止を1タップで絞込', productAdmin.includes('quickfilters') && productAdmin.includes('data-status="sold_out"'));
-expect('更新キャッシュ番号', worker.includes("machi-order-v71-24"));
+expect('更新キャッシュ番号', worker.includes("machi-order-v71-25"));
 expect('営業時間外・受付停止を注文前に表示', menu.includes('orderingMessage') && menu.includes('現在は注文できません'));
 expect('店長が注文受付を一時停止・再開できる', productAdmin.includes('set_ordering_enabled') && productAdmin.includes('注文受付を停止中'));
 expect('注文受付停止をAPI側でも返す', menuApi.includes('注文受付を一時停止しています'));
@@ -72,8 +72,8 @@ expect('厨房オフライン表示と復帰時再接続', kitchen.includes("add
 expect('厨房通知設定を保持して新規注文時に振動', kitchen.includes('machi_kitchen_sound') && kitchen.includes('navigator.vibrate'));
 expect('厨房専用アプリは厨房画面から起動', kitchen.includes('/kitchen.webmanifest') && kitchenManifest.includes('"start_url": "/kitchen.html"'));
 expect('長浜店の厨房アプリ名を固定', kitchenManifest.includes('151 厨房・長浜店') && kitchenManifest.includes('151長浜厨房'));
-expect('白木原店は専用アプリで誤表示を防止', shirakibaruManifest.includes('151 厨房・白木原店') && shirakibaruKitchen.includes('長浜店の注文は表示しません'));
-expect('厨房アプリ選択画面で店舗を明示', kitchenApps.includes('長浜店') && kitchenApps.includes('白木原店') && kitchenApps.includes('本番稼働中'));
+expect('白木原店は専用アプリで誤表示を防止', shirakibaruManifest.includes('151 厨房・白木原店') && shirakibaruKitchen.includes("/kitchen.html?store=shirakibaru") && uiConfig.includes("replace('store_id=1','store_id=2')"));
+expect('厨房アプリ選択画面で店舗を明示', kitchenApps.includes('長浜店の注文だけを表示') && kitchenApps.includes('白木原店の注文だけを表示'));
 expect('厨房画面から5分端末テストを実行', kitchen.includes('厨房タブレット 5分テスト') && kitchen.includes('test-sound') && kitchen.includes('test-refresh'));
 expect('勤怠打刻は保存済みログインを使用', timeClock.includes('machi_access_token') && !timeClock.includes('ログイントークン'));
 expect('出勤・休憩・退勤を状態別に操作', timeClock.includes("act('clock_in')") && timeClock.includes("act('break_start')") && timeClock.includes("act('break_end')") && timeClock.includes("act('clock_out')"));
@@ -81,7 +81,7 @@ expect('勤怠APIは二重打刻と休憩中退勤を防止', workforceApi.inclu
 expect('シフト日付検証は数字を正しく受け付ける', workforceApi.includes('/^\\d{4}-\\d{2}-\\d{2}$/') && !workforceApi.includes('/^\\\\d{4}'));
 expect('マイシフトは手入力トークンを廃止', myShifts.includes('machi_access_token') && !myShifts.includes('ログイントークン'));
 expect('スタッフ画面から勤怠打刻へ移動', uiConfig.includes("link.href='/time-clock.html'"));
-expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-24") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
+expect('勤怠・シフトをオフラインキャッシュ対象に追加', worker.includes("machi-order-v71-25") && worker.includes("'/time-clock.html'") && worker.includes("'/my-shifts.html'"));
 expect('日次締めは保存済みログインを使用', closing.includes('machi_access_token') && !closing.includes('アクセストークン'));
 expect('閉店チェック完了前は締め不可', closing.includes('checksDone()') && closing.includes('data-close-check'));
 expect('現金差額ありは理由入力が必須', closingApi.includes('現金差額があるため') && closingApi.includes('!note'));

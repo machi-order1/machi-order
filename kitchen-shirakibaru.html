@@ -17,11 +17,11 @@
   <main class="card">
     <div class="ey">MACHI ORDER · KITCHEN</div>
     <h1>白木原店 厨房</h1>
-    <div class="status">店舗データ設定中</div>
-    <p class="text">白木原店専用の店舗・席・商品・スタッフ権限を本番データベースへ登録したあと、この画面から注文を表示します。</p>
-    <p class="safe">長浜店の注文は表示しません。店舗設定が完了するまで誤操作できない状態です。</p>
-    <a class="back" href="/login.html?next=/kitchen-shirakibaru.html">スタッフログインへ</a>
+    <div class="status">白木原店専用画面を開きます</div>
+    <p class="text">店舗別の権限確認後、白木原店の注文だけを表示します。</p>
+    <p class="safe">長浜店の注文は表示されません。</p>
+    <a class="back" href="/kitchen.html?store=shirakibaru">白木原店の厨房を開く</a>
   </main>
-  <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});</script>
+  <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});location.replace('/kitchen.html?store=shirakibaru');</script>
 </body>
 </html>
