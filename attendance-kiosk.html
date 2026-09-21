@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#d92d2d" />
+    <title>店舗打刻｜MACHI ORDER</title>
+    <link rel="stylesheet" href="/machi-design-system.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f5f2ed;
+        color: #171717;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Noto Sans JP", sans-serif;
+      }
+      .top {
+        background: #d92d2d;
+        color: #fff;
+        padding: 22px 18px;
+      }
+      .top h1 {
+        margin: 5px 0;
+        font-size: 30px;
+      }
+      .top small {
+        font-weight: 800;
+      }
+      .wrap {
+        max-width: 760px;
+        margin: auto;
+        padding: 14px 14px 80px;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #e4ded7;
+        border-radius: 22px;
+        padding: 18px;
+        margin: 12px 0;
+      }
+      .clock {
+        text-align: center;
+        font-size: 26px;
+        font-weight: 950;
+        font-variant-numeric: tabular-nums;
+        margin: 8px;
+      }
+      .staff-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+      .person {
+        min-height: 72px;
+        border: 2px solid #e4ded7;
+        background: #fff;
+        border-radius: 17px;
+        font-size: 18px;
+        font-weight: 900;
+      }
+      .person.on {
+        border-color: #d92d2d;
+        background: #fff3f2;
+      }
+      .field {
+        margin: 13px 0;
+      }
+      .field label {
+        display: block;
+        font-weight: 900;
+        margin-bottom: 6px;
+      }
+      .field input,
+      .field select {
+        width: 100%;
+        padding: 14px;
+        border: 1px solid #bbb;
+        border-radius: 13px;
+        font-size: 18px;
+      }
+      .pin {
+        letter-spacing: 0.3em;
+        text-align: center;
+        font-size: 28px !important;
+      }
+      .btn {
+        width: 100%;
+        border: 0;
+        border-radius: 15px;
+        padding: 16px;
+        background: #171717;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 950;
+      }
+      .red {
+        background: #d92d2d;
+      }
+      .outline {
+        background: #fff;
+        color: #171717;
+        border: 2px solid #171717;
+      }
+      .actions {
+        display: grid;
+        gap: 10px;
+      }
+      .state {
+        text-align: center;
+      }
+      .state h2 {
+        font-size: 29px;
+        margin: 4px;
+      }
+      .muted {
+        color: #777;
+      }
+      .msg {
+        min-height: 24px;
+        color: #b42318;
+        font-weight: 850;
+        margin: 10px 2px;
+      }
+      .ok {
+        color: #15723b;
+      }
+      .hide {
+        display: none !important;
+      }
+      .setup {
+        border-top: 7px solid #d92d2d;
+      }
+      .back {
+        color: #555;
+        text-decoration: none;
+        font-weight: 800;
+      }
+      @media (min-width: 650px) {
+        .staff-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <small>MACHI ORDER · ATTENDANCE</small>
+      <h1>店舗打刻</h1>
+      <div id="device">端末を確認しています…</div>
+    </header>
+    <main class="wrap">
+      <div class="clock" id="clock"></div>
+      <section class="card setup hide" id="setup">
+        <h2>この端末を登録</h2>
+        <p class="muted">
+          初回だけ店長ログインが必要です。登録後はスタッフが暗証番号で打刻できます。
+        </p>
+        <div class="field">
+          <label>店舗</label
+          ><select id="setup-store"></select>
+        </div>
+        <div class="field">
+          <label>端末名</label
+          ><input id="device-name" value="店舗iPad" maxlength="80" />
+        </div>
+        <button class="btn red" id="register">この端末を登録する</button>
+      </section>
+      <section class="card hide" id="chooser">
+        <h2>自分の名前を選んでください</h2>
+        <div class="staff-grid" id="staff"></div>
+      </section>
+      <section class="card hide" id="pin-card">
+        <a class="back" href="#" id="back">← 名前を選び直す</a>
+        <h2 id="selected-name"></h2>
+        <div class="field">
+          <label>暗証番号</label
+          ><input
+            class="pin"
+            id="pin"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="8"
+            autocomplete="off"
+            placeholder="••••"
+          />
+        </div>
+        <button class="btn red" id="open">打刻画面を開く</button>
+      </section>
+      <section class="card state hide" id="status">
+        <div class="muted">現在の状態</div>
+        <h2 id="state">—</h2>
+        <div id="detail"></div>
+      </section>
+      <div class="actions hide" id="actions">
+        <button class="btn red" id="clock-in">出勤する</button
+        ><button class="btn outline" id="break-start">休憩を開始</button
+        ><button class="btn red" id="break-end">休憩を終了</button
+        ><button class="btn" id="clock-out">退勤する</button
+        ><button class="btn outline" id="lock">終了して名前選択へ</button>
+      </div>
+      <div class="msg" id="msg" role="alert"></div>
+    </main>
+    <script>
+      (() => {
+        const API =
+            "https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/attendance-kiosk-api",
+          $ = (s) => document.querySelector(s),
+          managerToken = () =>
+            localStorage.machi_access_token ||
+            localStorage.mo_staff_token ||
+            "",
+          deviceToken = () => localStorage.machi_kiosk_token || "";
+        let roster = [],
+          selected = null,
+          pin = "",
+          snapshot = null,
+          lockTimer = null,
+          busy = false;
+        const esc = (s) =>
+          String(s ?? "").replace(
+            /[&<>"']/g,
+            (c) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+              })[c],
+          );
+        const fmt = (t) =>
+          t
+            ? new Date(t).toLocaleTimeString("ja-JP", {
+                timeZone: "Asia/Tokyo",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "—";
+        const setMsg = (s, ok = false) => {
+          $("#msg").textContent = s;
+          $("#msg").className = "msg" + (ok ? " ok" : "");
+        };
+        function tick() {
+          $("#clock").textContent = new Date().toLocaleString("ja-JP", {
+            timeZone: "Asia/Tokyo",
+            month: "long",
+            day: "numeric",
+            weekday: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+        }
+        async function api(method = "GET", body = null, manager = false) {
+          const headers = { "Content-Type": "application/json" };
+          if (manager) headers.Authorization = "Bearer " + managerToken();
+          else if (deviceToken()) headers["x-kiosk-token"] = deviceToken();
+          const r = await fetch(API, {
+              method,
+              headers,
+              body: body ? JSON.stringify(body) : undefined,
+            }),
+            j = await r.json().catch(() => ({}));
+          if (!r.ok)
+            throw Object.assign(Error(j.error || "処理できませんでした"), {
+              status: r.status,
+            });
+          return j;
+        }
+        function choose(x) {
+          selected = x;
+          $("#selected-name").textContent = x.display_name + "さん";
+          $("#chooser").classList.add("hide");
+          $("#pin-card").classList.remove("hide");
+          $("#pin").value = "";
+          $("#pin").focus();
+          setMsg("");
+        }
+        function showRoster() {
+          selected = null;
+          pin = "";
+          snapshot = null;
+          clearTimeout(lockTimer);
+          $("#chooser").classList.remove("hide");
+          $("#pin-card").classList.add("hide");
+          $("#status").classList.add("hide");
+          $("#actions").classList.add("hide");
+          $("#staff").innerHTML =
+            roster
+              .map(
+                (x) =>
+                  `<button class="person" data-id="${x.id}">${esc(x.display_name)}</button>`,
+              )
+              .join("") ||
+            '<div class="muted">暗証番号が設定済みのスタッフがいません。スタッフ名簿から設定してください。</div>';
+          document
+            .querySelectorAll(".person")
+            .forEach(
+              (b) =>
+                (b.onclick = () =>
+                  choose(roster.find((x) => x.id === Number(b.dataset.id)))),
+            );
+        }
+        function renderStatus() {
+          const c = snapshot.current || {},
+            working = c.working,
+            onBreak = c.on_break,
+            s = c.shift;
+          $("#pin-card").classList.add("hide");
+          $("#status").classList.remove("hide");
+          $("#actions").classList.remove("hide");
+          $("#state").textContent = !working
+            ? "未出勤"
+            : onBreak
+              ? "休憩中"
+              : "勤務中";
+          $("#detail").innerHTML =
+            `<b>${esc(snapshot.person.display_name)}</b>${working ? `<br>出勤 ${fmt(s.clock_in)}${s.break_minutes ? `／終了済み休憩 ${s.break_minutes}分` : ""}` : "<br>出勤すると勤務時間の計測を開始します。"}`;
+          $("#clock-in").classList.toggle("hide", working);
+          $("#break-start").classList.toggle("hide", !working || onBreak);
+          $("#break-end").classList.toggle("hide", !working || !onBreak);
+          $("#clock-out").classList.toggle("hide", !working || onBreak);
+          clearTimeout(lockTimer);
+          lockTimer = setTimeout(showRoster, 30000);
+        }
+        async function status() {
+          pin = $("#pin").value.trim();
+          if (!selected || !/^[0-9]{4,8}$/.test(pin)) {
+            setMsg("4〜8桁の暗証番号を入力してください");
+            return;
+          }
+          try {
+            $("#open").disabled = true;
+            snapshot = await api("POST", {
+              action: "status",
+              staff_id: selected.id,
+              pin,
+            });
+            renderStatus();
+            setMsg("");
+          } catch (e) {
+            setMsg(e.message);
+            $("#pin").value = "";
+            $("#pin").focus();
+          } finally {
+            $("#open").disabled = false;
+          }
+        }
+        async function act(action) {
+          if (busy || !selected) return;
+          busy = true;
+          document
+            .querySelectorAll("#actions button")
+            .forEach((b) => (b.disabled = true));
+          try {
+            await api("POST", { action, staff_id: selected.id, pin });
+            setMsg(
+              {
+                clock_in: "出勤を記録しました",
+                break_start: "休憩開始を記録しました",
+                break_end: "休憩終了を記録しました",
+                clock_out: "退勤を記録しました",
+              }[action],
+              true,
+            );
+            snapshot = await api("POST", {
+              action: "status",
+              staff_id: selected.id,
+              pin,
+            });
+            renderStatus();
+            clearTimeout(lockTimer);
+            lockTimer = setTimeout(showRoster, 3500);
+          } catch (e) {
+            setMsg(e.message);
+          } finally {
+            busy = false;
+            document
+              .querySelectorAll("#actions button")
+              .forEach((b) => (b.disabled = false));
+          }
+        }
+        async function setup() {
+          if (!managerToken()) {
+            $("#setup").classList.remove("hide");
+            $("#setup").innerHTML =
+              '<h2>店長ログインが必要です</h2><a class="btn red" style="display:block;text-align:center;text-decoration:none" href="/login.html?next=/attendance-kiosk.html">ログインして端末を登録</a>';
+            return;
+          }
+          try {
+            const j = await api("GET", null, true);
+            $("#setup").classList.remove("hide");
+            $("#setup-store").innerHTML = j.stores
+              .map((s) => `<option value="${s.id}">${esc(s.name)}</option>`)
+              .join("");
+          } catch (e) {
+            setMsg(e.message);
+          }
+        }
+        async function register() {
+          try {
+            $("#register").disabled = true;
+            const j = await api(
+              "POST",
+              {
+                action: "device_register",
+                store_id: Number($("#setup-store").value),
+                device_name: $("#device-name").value,
+              },
+              true,
+            );
+            localStorage.machi_kiosk_token = j.kiosk_token;
+            location.reload();
+          } catch (e) {
+            setMsg(e.message);
+          } finally {
+            $("#register").disabled = false;
+          }
+        }
+        async function init() {
+          try {
+            const j = await api();
+            roster = j.staff || [];
+            $("#device").textContent = j.device_name;
+            showRoster();
+          } catch (e) {
+            if (e.status === 401) {
+              localStorage.removeItem("machi_kiosk_token");
+              $("#device").textContent = "初回設定";
+              setup();
+            } else setMsg(e.message);
+          }
+        }
+        $("#back").onclick = (e) => {
+          e.preventDefault();
+          showRoster();
+        };
+        $("#open").onclick = status;
+        $("#pin").onkeydown = (e) => {
+          if (e.key === "Enter") status();
+        };
+        $("#clock-in").onclick = () => act("clock_in");
+        $("#break-start").onclick = () => act("break_start");
+        $("#break-end").onclick = () => act("break_end");
+        $("#clock-out").onclick = () => act("clock_out");
+        $("#lock").onclick = showRoster;
+        $("#register").onclick = register;
+        setInterval(tick, 1000);
+        tick();
+        init();
+      })();
+    </script>
+  </body>
+</html>
