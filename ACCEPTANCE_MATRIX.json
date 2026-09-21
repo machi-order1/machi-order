@@ -32,7 +32,7 @@
     "blocker": "closing-api E2E"
   },
   "manager": {
-    "status": "ui_ready",
-    "blocker": "metric reconciliation"
+    "status": "ready_for_authenticated_e2e",
+    "blocker": "authenticated E2E on manager device"
   }
 }
