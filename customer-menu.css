@@ -97,3 +97,16 @@
 @media (max-width: 360px) {
   .customer-menu-layout { grid-template-columns: 78px minmax(0, 1fr); gap: 8px; padding-right: 8px; }
 }
+
+/* Reserve space for actions: only the options scroll, never under the button. */
+.sheet.product-sheet { display: flex; flex-direction: column; max-height: 90vh; max-height: 90dvh; padding: 0; overflow: hidden; }
+.product-heading { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f1dcd6; }
+.product-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 19px; line-height: 1.4; }
+.product-dismiss { flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #fff0ee; color: #a71924; font-size: 28px; }
+.product-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding: 0 max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left)); }
+.product-actions { flex: 0 0 auto; display: flex; gap: 12px; align-items: center; padding: 12px max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); background: #fffaf8; border-top: 1px solid #eed5cf; box-shadow: 0 -4px 16px #47110a0d; }
+.product-actions .qtyrow, .product-actions .qty { display: flex; align-items: center; gap: 6px; margin: 0; flex: 0 0 auto; }
+.product-actions .qtyrow button, .product-actions .qty button { min-width: 36px; min-height: 44px; padding: 8px; }
+.product-actions .product-add { flex: 1; min-width: 0; width: auto; margin: 0; padding: 10px 8px; min-height: 56px; font-size: 15px; line-height: 1.35; border-radius: 14px; }
+.product-add span { display: block; }
+.product-add span:first-child { font-size: 18px; font-weight: 900; }

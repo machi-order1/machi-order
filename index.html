@@ -333,20 +333,25 @@
       saveCart(); updateCart(); showCart();
     }
     function drawProduct() {
+      const top = $('modal').querySelector('.product-scroll')?.scrollTop || 0;
+      const left = $('modal').querySelector('.topping-strip')?.scrollLeft || 0;
       const unit = Number(current.price) + optionDelta();
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet"><div class="row"><h2>${Machi.escapeHtml(current.name)}</h2><div class="price">${Machi.yen(unit)}</div></div>${CustomerOptions.render(productGroups(current), selected, Machi.escapeHtml, Machi.yen)}<p class="desc">変更内容はこの一杯に反映します。数量を増やすとすべて同じ内容です。内容を変える場合は別々に追加してください。</p><h3>数量</h3><div class="qtyrow"><button class="mini" data-qty="-1">−</button><b>${quantity}</b><button class="mini" data-qty="1">＋</button></div><button id="add-item" class="order">${Machi.yen(unit * quantity)}　カートに追加</button><button id="close-modal" class="choice">閉じる</button></div>`;
+      $('modal').innerHTML = `<div class="sheet product-sheet"><div class="product-heading"><h2>${Machi.escapeHtml(current.name)}</h2><button id="close-modal" class="product-dismiss" aria-label="商品選択を閉じる">×</button></div><div class="product-scroll">${CustomerOptions.render(productGroups(current), selected, Machi.escapeHtml, Machi.yen)}<p class="desc">変更内容はこの一杯に反映します。数量を増やすとすべて同じ内容です。内容を変える場合は別々に追加してください。</p></div><div class="product-actions"><div class="qtyrow" aria-label="数量"><button class="mini" data-qty="-1" aria-label="数量を減らす">−</button><b>${quantity}</b><button class="mini" data-qty="1" aria-label="数量を増やす">＋</button></div><button id="add-item" class="order product-add"><span>${Machi.yen(unit * quantity)}</span><span>カートに追加</span></button></div></div>`;
       document.querySelectorAll('[data-group]').forEach((button) => button.onclick = () => toggleOption(Number(button.dataset.group), Number(button.dataset.option), Number(button.dataset.max)));
       document.querySelectorAll('[data-qty]').forEach((button) => button.onclick = () => { quantity = Math.max(1, Math.min(20, quantity + Number(button.dataset.qty))); drawProduct(); });
+      $('modal').querySelector('.product-scroll').scrollTop = top;
+      const strip = $('modal').querySelector('.topping-strip');
+      if (strip) strip.scrollLeft = left;
       $('add-item').onclick = addItem;
       $('close-modal').onclick = closeModal;
     }
     function toggleOption(groupId, optionId) {
-      const top = $('modal').querySelector('.sheet').scrollTop;
+      const top = $('modal').querySelector('.product-scroll').scrollTop;
       const left = $('modal').querySelector('.topping-strip')?.scrollLeft || 0;
       if (!CustomerOptions.toggle(productGroups(current), selected, groupId, optionId)) return;
       drawProduct();
-      $('modal').querySelector('.sheet').scrollTop = top;
+      $('modal').querySelector('.product-scroll').scrollTop = top;
       const strip = $('modal').querySelector('.topping-strip');
       if (strip) strip.scrollLeft = left;
     }
