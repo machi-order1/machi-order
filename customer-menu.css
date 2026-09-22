@@ -194,3 +194,13 @@
   .customer-menu-layout #menu .set-card .product { padding: 0; }
   .customer-menu-layout #menu .set-card .pricebox { grid-column: 1 / -1; padding: 0; }
 }
+
+/* A small, optional next step after adding noodles; no extra product-sheet footer. */
+.added-notice.added-next { display: block; padding: 10px 12px; max-height: 45dvh; overflow-y: auto; }
+.added-next-heading { display: flex; align-items: center; gap: 8px; }
+.added-next .added-next-caption { margin: 2px 0 8px; color: #79655a; }
+.added-next-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.added-next-links button { min-height: 44px; padding: 7px 3px; border: 1px solid #ead1c8; border-radius: 9px; background: #fff; color: #92222a; font-size: 12px; font-weight: 750; overflow-wrap: anywhere; cursor: pointer; }
+.added-next-actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.added-next-actions button { min-height: 44px; }
+.added-continue { border: 0; padding: 4px; background: transparent; color: #79655a; font-size: 12px; text-decoration: underline; cursor: pointer; }
