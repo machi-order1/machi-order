@@ -118,3 +118,31 @@
 
 /* Let options show softly through the hint, with room to scroll the last row clear. */
 .product-scroll:has(+ .ingredient-jump) { padding-bottom: 60px; }
+
+/* Share a translucent lower panel while keeping the primary action opaque. */
+.sheet.product-sheet:has(.ingredient-jump) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  height: 90vh;
+  height: 90dvh;
+}
+.product-sheet:has(.ingredient-jump) > .product-heading { grid-area: 1 / 1; }
+.product-sheet:has(.ingredient-jump) > .product-scroll {
+  grid-area: 2 / 1 / 5 / 2;
+  padding-bottom: calc(140px + max(12px, env(safe-area-inset-bottom)));
+}
+.product-sheet:has(.ingredient-jump) > .ingredient-jump { grid-area: 3 / 1; margin-top: 0; }
+.product-sheet:has(.ingredient-jump) > .product-actions { grid-area: 4 / 1; }
+.product-actions {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 241, 220, .76);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  border-top-color: #efd9ce99;
+}
+.product-actions .qtyrow button, .product-actions .qty button {
+  background: rgba(255, 240, 238, .76);
+  color: #a71924;
+}
