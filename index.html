@@ -368,6 +368,36 @@
       saveCart();
       updateCart();
       closeModal();
+      showAddedNotice(current);
+    }
+
+    function setOffers(product) {
+      if (Number(product.category_id) !== 1 || orderingMessage()) return [];
+      if (cart.some(item => [16,17,18,19,20].includes(Number(item.product_id)))) return [];
+      return [16,20].map(id => data.products.find(item => Number(item.id) === id))
+        .filter(item => item && item.sale_status === 'available');
+    }
+    function showAddedNotice(product) {
+      let notice = $('added-notice');
+      if (!notice) {
+        notice = document.createElement('aside');
+        notice.id = 'added-notice';
+        notice.className = 'added-notice';
+        document.querySelector('main').insertAdjacentElement('beforebegin', notice);
+      }
+      const offers = setOffers(product);
+      notice.innerHTML = `<div class="added-heading"><p role="status">✓ ${Machi.escapeHtml(product.name)}を追加しました</p><button type="button" class="added-dismiss" aria-label="追加のお知らせを閉じる">×</button></div>${offers.length ? `<p class="set-offer-title">一緒にセットはいかがですか？</p><div class="set-offers">${offers.map(item => `<button type="button" data-offer-set="${Number(item.id)}"><img src="/assets/menu-items/web/set-${Number(item.id) === 16 ? 'a' : 'e'}.webp" alt="" width="48" height="48"><span><b>${Machi.escapeHtml(item.name)}</b><small>＋${Machi.yen(item.price)}／1点</small></span></button>`).join('')}</div>` : ''}<button type="button" class="added-review">${offers.length ? 'セットを付けずに注文内容を確認' : '注文内容を確認する'} →</button>`;
+      notice.querySelector('.added-dismiss').onclick = () => notice.remove();
+      notice.querySelector('.added-review').onclick = showCart;
+      notice.querySelectorAll('[data-offer-set]').forEach(button => button.onclick = () => {
+        const id = Number(button.dataset.offerSet);
+        const item = data.products.find(value => Number(value.id) === id);
+        if (!item || item.sale_status !== 'available' || orderingMessage()) return;
+        button.disabled = true;
+        pick(id);
+        if (!productGroups(current).length) addItem();
+      });
+      notice.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     function updateCart() {
       const count = cart.reduce((sum, item) => sum + Number(item.quantity), 0);
@@ -376,6 +406,7 @@
       $('sum').textContent = `${count}点　${Machi.yen(total)}`;
     }
     function showCart() {
+      $('added-notice')?.remove();
       const total = cart.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
       $('modal').className = 'modal';
       const stopped = orderingMessage();
