@@ -15,6 +15,7 @@
   <script src="/machi-app.js"></script>
   <script src="/customer-promotions.js"></script>
   <link rel="stylesheet" href="/customer-promotions.css">
+  <script src="/customer-options.js"></script>
 </head>
 <body>
   <div id="net" class="net hidden">オフライン</div>
@@ -213,7 +214,7 @@
     function showTakeout() {
       const supported = data.store === '長浜店';
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet"><h2>おうちへのおみやげに</h2><p>油そばやご飯ものを、ご家族にも。</p><div class="notice">持ち帰りは店内注文と別の注文・会計です。受取時刻を指定して注文できます。店内のカートはこの画面に残ります。</div>${supported ? '<p>商品の持ち帰り可否・容器代はスタッフにご確認ください。</p><a class="order takeout-link" href="/takeout.html?store_id=1" target="_blank" rel="noopener">持ち帰りメニューを開く（別画面）</a>' : '<div class="notice">この店舗の持ち帰り注文は、スタッフへお声がけください。</div>'}<button id="close-modal" class="choice">店内メニューへ戻る</button></div>`;
+      $('modal').innerHTML = `<div class="sheet"><h2>おうちへのおみやげに</h2><p>油そばやご飯ものを、ご家族にも。</p><div class="notice">持ち帰りは店内注文と別の注文・会計です。受取時刻を指定して注文できます。店内のカートはこの画面に残ります。</div>${supported ? '<p>商品の持ち帰り可否・容器代はスタッフにご確認ください。</p><a class="order takeout-link" href="/takeout.html?store_id=' + Number(data.store.id) + '" target="_blank" rel="noopener">持ち帰りメニューを開く（別画面）</a>' : '<div class="notice">この店舗の持ち帰り注文は、スタッフへお声がけください。</div>'}<button id="close-modal" class="choice">店内メニューへ戻る</button></div>`;
       $('close-modal').onclick = closeModal;
     }
     function productCard(product) {
@@ -280,30 +281,78 @@
     function pick(id) {
       current = data.products.find((product) => Number(product.id) === id);
       if (!current) return;
+      if (isTopping(current)) return showToppingTargets(current);
       selected = {};
       productGroups(current).forEach((group) => selected[group.id] = []);
       quantity = 1;
       drawProduct();
     }
+    function linkedTopping(product, topping) {
+      for (const group of productGroups(product)) {
+        const option = (group.options || []).find(item => Number(item.source_product_id) === Number(topping.id) ||
+          (Number(topping.id) === 10 && group.name === '高菜の量' && item.name === '高菜大盛り'));
+        if (option && option.available !== false) return { group, option };
+      }
+      return null;
+    }
+    function showToppingTargets(topping) {
+      const bowls = (data.products || []).filter(product => Number(product.category_id) === 1 && product.sale_status === 'available' && linkedTopping(product, topping));
+      const targets = cart.map((item, index) => ({ item, index, product: bowls.find(product => Number(product.id) === Number(item.product_id)) })).filter(target => target.product);
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><h2>${Machi.escapeHtml(topping.name)}</h2><p>追加する油そばを選んでください。</p>${targets.length ? '<h3>カートの一杯に追加</h3>' : ''}${targets.map(({ item, index, product }) => {
+        const link = linkedTopping(product, topping);
+        const exists = item.option_ids.includes(Number(link.option.id));
+        return `<button class="choice" data-target-cart="${index}" ${exists ? 'disabled' : ''}>${Machi.escapeHtml(item.name)}<span class="desc">${item.option_names.map(Machi.escapeHtml).join(' ／ ')}</span><br>${exists ? '追加済み' : `1杯に追加 ＋${Machi.yen(link.option.price_delta)}`}</button>`;
+      }).join('')}<h3>油そばを新しく選ぶ</h3>${bowls.map(product => `<button class="choice" data-target-new="${Number(product.id)}">${Machi.escapeHtml(product.name)}</button>`).join('')}<p class="desc">注文済みの油そばへの追加は、スタッフへお声がけください。</p><button id="close-modal" class="choice">戻る</button></div>`;
+      document.querySelectorAll('[data-target-cart]').forEach(button => button.onclick = () => {
+        addToppingToCart(Number(button.dataset.targetCart), topping);
+      });
+      document.querySelectorAll('[data-target-new]').forEach(button => button.onclick = () => {
+        pick(Number(button.dataset.targetNew));
+        const { group, option } = linkedTopping(current, topping);
+        CustomerOptions.toggle(productGroups(current), selected, Number(group.id), Number(option.id));
+        drawProduct();
+      });
+      $('close-modal').onclick = closeModal;
+    }
+    function addToppingToCart(index, topping) {
+      const item = cart[index];
+      const product = data.products.find(value => Number(value.id) === Number(item?.product_id));
+      if (!item || !product || product.sale_status !== 'available' || topping.sale_status !== 'available') return;
+      const link = linkedTopping(product, topping);
+      if (!link || item.option_ids.includes(Number(link.option.id))) return;
+      const groups = productGroups(product);
+      const choices = Object.fromEntries(groups.map(group => [group.id, (item.option_ids || []).filter(id => (group.options || []).some(option => Number(option.id) === Number(id))).map(Number)]));
+      if (!CustomerOptions.toggle(groups, choices, Number(link.group.id), Number(link.option.id))) return;
+      const error = CustomerOptions.validate(groups, choices);
+      if (error) return alert(error);
+      const optionIds = Object.values(choices).flat();
+      const changed = { ...item, quantity: 1, option_ids: optionIds, option_names: optionDetails(optionIds).map(option => option.name), price: Number(product.price) + optionDetails(optionIds).reduce((sum, option) => sum + Number(option.price_delta || 0), 0) };
+      if (Number(item.quantity) > 1) { item.quantity = Number(item.quantity) - 1; cart.push(changed); }
+      else cart[index] = changed;
+      saveCart(); updateCart(); showCart();
+    }
     function drawProduct() {
       const unit = Number(current.price) + optionDelta();
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet"><div class="row"><h2>${Machi.escapeHtml(current.name)}</h2><div class="price">${Machi.yen(unit)}</div></div>${productGroups(current).map((group) => `<h3>${Machi.escapeHtml(group.name)}${group.required ? '（必須）' : ''}</h3>${(group.options || []).map((option) => `<button class="choice ${(selected[group.id] || []).includes(option.id) ? 'sel' : ''}" data-group="${Number(group.id)}" data-option="${Number(option.id)}" data-max="${Number(group.max_select || 1)}">${Machi.escapeHtml(option.name)} ${Number(option.price_delta) ? `+${Machi.yen(option.price_delta)}` : ''}</button>`).join('')}`).join('')}<h3>数量</h3><div class="qtyrow"><button class="mini" data-qty="-1">−</button><b>${quantity}</b><button class="mini" data-qty="1">＋</button></div><button id="add-item" class="order">${Machi.yen(unit * quantity)}　カートに追加</button><button id="close-modal" class="choice">閉じる</button></div>`;
+      $('modal').innerHTML = `<div class="sheet"><div class="row"><h2>${Machi.escapeHtml(current.name)}</h2><div class="price">${Machi.yen(unit)}</div></div>${CustomerOptions.render(productGroups(current), selected, Machi.escapeHtml, Machi.yen)}<p class="desc">変更内容はこの一杯に反映します。数量を増やすとすべて同じ内容です。内容を変える場合は別々に追加してください。</p><h3>数量</h3><div class="qtyrow"><button class="mini" data-qty="-1">−</button><b>${quantity}</b><button class="mini" data-qty="1">＋</button></div><button id="add-item" class="order">${Machi.yen(unit * quantity)}　カートに追加</button><button id="close-modal" class="choice">閉じる</button></div>`;
       document.querySelectorAll('[data-group]').forEach((button) => button.onclick = () => toggleOption(Number(button.dataset.group), Number(button.dataset.option), Number(button.dataset.max)));
       document.querySelectorAll('[data-qty]').forEach((button) => button.onclick = () => { quantity = Math.max(1, Math.min(20, quantity + Number(button.dataset.qty))); drawProduct(); });
       $('add-item').onclick = addItem;
       $('close-modal').onclick = closeModal;
     }
-    function toggleOption(groupId, optionId, max) {
-      const values = selected[groupId] || [];
-      selected[groupId] = values.includes(optionId) ? values.filter((id) => id !== optionId) : max === 1 ? [optionId] : [...values, optionId];
+    function toggleOption(groupId, optionId) {
+      const top = $('modal').querySelector('.sheet').scrollTop;
+      const left = $('modal').querySelector('.topping-strip')?.scrollLeft || 0;
+      if (!CustomerOptions.toggle(productGroups(current), selected, groupId, optionId)) return;
       drawProduct();
+      $('modal').querySelector('.sheet').scrollTop = top;
+      const strip = $('modal').querySelector('.topping-strip');
+      if (strip) strip.scrollLeft = left;
     }
     function addItem() {
-      for (const group of productGroups(current)) {
-        const minimum = Number(group.min_select || (group.required ? 1 : 0));
-        if ((selected[group.id] || []).length < minimum) return alert(`${group.name}を選んでください`);
-      }
+      const error = CustomerOptions.validate(productGroups(current), selected);
+      if (error) return alert(error);
       const optionIds = Object.values(selected).flat();
       cart.push({ product_id: current.id, quantity, option_ids: optionIds, option_names: optionDetails(optionIds).map((item) => item.name), name: current.name, price: Number(current.price) + optionDelta() });
       saveCart();
