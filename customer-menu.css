@@ -146,3 +146,21 @@
   background: rgba(255, 240, 238, .76);
   color: #a71924;
 }
+
+/* Compact noodle sizes keep toppings visible sooner. */
+.noodle-size-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.noodle-size-options h3 { grid-column: 1 / -1; margin: 0 0 8px; font-size: 16px; }
+.noodle-size-options .choice { min-width: 0; margin: 0; padding: 12px 3px; border-radius: 12px; text-align: center; font-size: 14px; min-height: 64px; }
+.noodle-size-options .choice span { font-size: 11px; }
+.added-notice { max-width: 732px; margin: 12px auto; padding: 12px 14px; border: 1px solid #ebc5ac; border-radius: 14px; background: #fff5e8; color: #49221b; scroll-margin-top: calc(var(--pinned-offer-height, 0px) + 12px); }
+.added-heading { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.added-heading p { margin: 0; font-size: 14px; font-weight: 750; }
+.added-dismiss { flex: 0 0 36px; min-height: 36px; border: 0; background: transparent; color: #85291d; font-size: 24px; }
+.set-offer-title { margin: 6px 0 8px; font-size: 13px; }
+.set-offers { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.set-offers button { display: flex; gap: 8px; align-items: center; text-align: left; border: 1px solid #edc6ba; border-radius: 10px; padding: 8px; background: #fff; color: #85291d; }
+.set-offers img { border-radius: 8px; object-fit: cover; }
+.set-offers b, .set-offers small { display: block; }
+.set-offers small { margin-top: 4px; }
+.added-review { display: block; width: 100%; min-height: 44px; margin-top: 8px; border: 0; background: transparent; color: #92222a; text-decoration: underline; font-weight: 700; }
+@media(max-width:760px) { .added-notice { margin: 10px 12px; } }

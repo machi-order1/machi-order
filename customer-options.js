@@ -14,6 +14,7 @@
     return sorted(groups).map(group => {
       const chosen = selected[group.id] || [];
       const ingredient = ingredients.has(group.name);
+      const noodleSize = /^麺量/.test(group.name);
       if (group.name === '追加トッピング') {
         return `<section class="bowl-options topping-options"><h3>この一杯にトッピング</h3><div class="topping-strip" role="group" aria-label="追加トッピング・複数選択できます">${(group.options || []).map(option => {
           const active = chosen.includes(Number(option.id));
@@ -25,7 +26,7 @@
         }).join('')}</div><p class="topping-hint">複数選べます・もう一度タップで解除</p></section>`;
       }
       const button = (id, name, price, disabled, active) => `<button type="button" class="choice ${active ? 'sel on' : ''}" data-group="${Number(group.id)}" data-option="${id}" data-max="${Number(group.max_select || 1)}" aria-pressed="${active}" ${disabled ? 'disabled' : ''}>${escape(name)} <span>${escape(price)}</span>${disabled ? '（売り切れ）' : ''}</button>`;
-      return `<section class="bowl-options ${ingredient ? 'ingredient-options' : ''}"><h3>${escape(group.name)}${group.required ? '（必須）' : ''}</h3>${ingredient ? button(0, '通常', 'この商品の標準量', false, chosen.length === 0) : ''}${(group.options || []).map(option => button(Number(option.id), option.name, priceLabel(option.price_delta, yen), option.available === false, chosen.includes(Number(option.id)))).join('')}</section>`;
+      return `<section class="bowl-options ${ingredient ? 'ingredient-options' : noodleSize ? 'noodle-size-options' : ''}"><h3>${escape(group.name)}${group.required ? '（必須）' : ''}</h3>${ingredient ? button(0, '通常', 'この商品の標準量', false, chosen.length === 0) : ''}${(group.options || []).map(option => button(Number(option.id), option.name, (noodleSize && option.name === '大盛' && Number(option.price_delta) === 0 ? '無料' : priceLabel(option.price_delta, yen)), option.available === false, chosen.includes(Number(option.id)))).join('')}</section>`;
     }).join('');
   }
   function toggle(groups, selected, groupId, optionId) {
