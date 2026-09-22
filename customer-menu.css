@@ -111,7 +111,10 @@
 .product-add span { display: block; }
 .product-add span:first-child { font-size: 18px; font-weight: 900; }
 
-.ingredient-jump { flex: 0 0 auto; width: 100%; border: 0; border-top: 1px solid #efd9ce; background: #fff1dc; color: #85291d; padding: 9px 10px; font-size: 12px; font-weight: 750; line-height: 1.4; text-align: center; cursor: pointer; }
+.ingredient-jump { position: relative; z-index: 1; flex: 0 0 44px; height: 44px; box-sizing: border-box; margin-top: -44px; width: 100%; border: 0; border-top: 1px solid #efd9ce99; background: rgba(255, 241, 220, .76); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); color: #85291d; padding: 6px 10px; font-size: 12px; font-weight: 750; line-height: 1.3; text-align: center; cursor: pointer; }
 .ingredient-jump span { display: inline-block; margin-left: 5px; font-size: 16px; }
 .ingredient-jump:focus-visible { outline: 2px solid #b91b2a; outline-offset: -3px; }
 .product-scroll .ingredient-options { scroll-margin-top: 12px; }
+
+/* Let options show softly through the hint, with room to scroll the last row clear. */
+.product-scroll:has(+ .ingredient-jump) { padding-bottom: 60px; }
