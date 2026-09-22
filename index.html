@@ -40,6 +40,22 @@
     'use strict';
     const q = new URLSearchParams(location.search);
     const seatToken = q.get('t') || '';
+    const alcoholPinKey = `machi_alcohol_pin_v71:${seatToken}`;
+    let alcoholPinned = false;
+    try { alcoholPinned = sessionStorage.getItem(alcoholPinKey) === '1'; } catch {}
+    function pinAlcoholAfterOrder(items) {
+      if (!CustomerPromotions.containsAlcohol(data, items)) return;
+      alcoholPinned = true;
+      try { sessionStorage.setItem(alcoholPinKey, '1'); } catch {}
+      // A display update must never turn a successful order into a retry warning.
+      try { renderHappyOffer(); } catch {}
+    }
+    function syncOfferHeight() {
+      const height = alcoholPinned ? $('happy-offer').getBoundingClientRect().height : 0;
+      document.documentElement.style.setProperty('--pinned-offer-height', `${height}px`);
+    }
+    if (window.ResizeObserver) new ResizeObserver(syncOfferHeight).observe(document.getElementById('happy-offer'));
+    window.addEventListener('resize', syncOfferHeight);
     const orderChannel = q.get('channel') === 'staff' ? 'staff' : 'qr';
     const testMode = q.get('test') === '1';
     const cartKey = `machi_cart_v71:${seatToken || 'missing'}`;
@@ -151,15 +167,17 @@
 
     function renderHappyOffer() {
       const offer = $('happy-offer');
-      offer.innerHTML = CustomerPromotions.renderHappy(data, Machi.escapeHtml, Machi.yen);
+      offer.innerHTML = CustomerPromotions.renderHappy(data, Machi.escapeHtml, Machi.yen, alcoholPinned);
       offer.classList.toggle('hidden', !offer.innerHTML);
+      offer.classList.toggle('is-pinned', alcoholPinned);
+      syncOfferHeight();
       document.querySelectorAll('[data-happy-product]').forEach(button => button.onclick = async () => {
         const id = Number(button.dataset.happyProduct);
         button.disabled = true;
         try {
           data = await Machi.api('menu-api', { params: { t: seatToken }, token: '' });
           renderMenu();
-          const product = CustomerPromotions.happyDrinks(data).find(item => Number(item.id) === id);
+          const product = (alcoholPinned ? CustomerPromotions.alcoholDrinks(data) : CustomerPromotions.happyDrinks(data)).find(item => Number(item.id) === id);
           if (!product || orderingMessage()) return alert('価格・受付状況が変わりました。最新のメニューをご確認ください。');
           pick(id);
           if (!productGroups(product).length) {
@@ -213,7 +231,7 @@
       setActiveCategory(id);
       const target = $(`c${id}`);
       const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      if (target) window.scrollTo({ top: Math.max(0, scrollY + target.getBoundingClientRect().top - 12), behavior: reducedMotion ? 'auto' : 'smooth' });
+      if (target) window.scrollTo({ top: Math.max(0, scrollY + target.getBoundingClientRect().top - 12 - (alcoholPinned ? $('happy-offer').getBoundingClientRect().height : 0)), behavior: reducedMotion ? 'auto' : 'smooth' });
     }
     let stopObservingSections = null;
     function observeSections() {
@@ -356,6 +374,7 @@
         const result = orderChannel === 'staff'
           ? await Machi.api('staff-order-api', { method: 'POST', body: payload })
           : await Machi.api('menu-api', { method: 'POST', token: '', body: payload });
+        pinAlcoholAfterOrder(cart);
         localStorage.removeItem(pendingKey);
         cart = [];
         saveCart();
