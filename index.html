@@ -484,22 +484,20 @@
       showAddedNotice(current);
     }
 
-    const snackNoticeKey = `machi_snack_notice_v71:${seatToken}:${orderChannel}`;
+    const snackNoticeKey = `machi_snack_notice_v71_shown:${seatToken}:${orderChannel}`;
     let snackNoticeSeen = false;
     try { snackNoticeSeen = sessionStorage.getItem(snackNoticeKey) === '1'; } catch {}
     function firstDrinkSnacks(product) {
       if (Number(product.category_id) !== 5 || snackNoticeSeen) return [];
-      snackNoticeSeen = true;
-      try { sessionStorage.setItem(snackNoticeKey, '1'); } catch {}
       const products = data.products || [];
       const find = id => products.find(p => Number(p.id) === Number(id));
       const hasSnack = cart.some(item => {
         const p = find(item.product_id);
         return Number(item.quantity) > 0 && p && Number(p.category_id) === 3 && !isTopping(p) && Number(p.id) !== 15;
       });
-      const alcoholCount = cart.reduce((sum, item) => sum + (Number(find(item.product_id)?.category_id) === 5 ? Number(item.quantity) : 0), 0);
-      if (hasSnack || alcoholCount > Number(quantity) || refillHistory.some(item => Number(item.category_id) === 5) || orderingMessage()) return [];
-      // Standalone snacks only: never offer the per-bowl topping as a side dish.
+      if (hasSnack || orderingMessage()) return [];
+      // Do not consume the one-time notice until it can actually be displayed.
+      // Old cart items and order history must not suppress a never-seen notice.
       return [25, 21].map(find).filter(p => p && Number(p.category_id) === 3 && !isTopping(p) && p.sale_status === 'available');
     }
     let addedNoticeTimer;
@@ -520,6 +518,10 @@
         notice.innerHTML = `<div class="added-next-heading"><p role="status">✓ ${Machi.escapeHtml(product.name)}をカートに追加しました</p><button type="button" class="added-dismiss" aria-label="追加のお知らせを閉じる">×</button></div><p class="added-next-caption">一杯のおともに、ちょいと一皿。</p><div class="added-snack-links">${snacks.map(snack => `<button type="button" data-snack-product="${Number(snack.id)}">${productPhoto(snack)}<span><b>${Machi.escapeHtml(snack.name)}</b><span>${Machi.yen(snack.price)}</span></span></button>`).join('')}</div><div class="added-next-actions"><button type="button" class="added-review">カートへ進む</button><button type="button" class="added-continue">今はいい</button></div>`;
       }
       document.querySelector('main').insertAdjacentElement('beforebegin', notice);
+      if (snacks.length) {
+        snackNoticeSeen = true;
+        try { sessionStorage.setItem(snackNoticeKey, '1'); } catch {}
+      }
       notice.querySelectorAll('[data-snack-product]').forEach(button => button.onclick = () => { notice.remove(); pick(Number(button.dataset.snackProduct)); });
       notice.querySelectorAll('[data-next-category]').forEach(button => button.onclick = () => { notice.remove(); goCategory(Number(button.dataset.nextCategory)); });
       if (notice.querySelector('.added-continue')) notice.querySelector('.added-continue').onclick = () => notice.remove();

@@ -12,10 +12,16 @@ function setup({ seen = false, items = [{ product_id: 30, quantity: 1 }], histor
   };vm.createContext(ctx);vm.runInContext(source,ctx);return ctx;
 }
 const alcohol={category_id:5};
-let c=setup();assert.deepEqual(Array.from(c.firstDrinkSnacks(alcohol),p=>p.id),[25,21]);assert.equal(c.firstDrinkSnacks(alcohol).length,0);
-for (const config of [{seen:true},{items:[{product_id:30,quantity:1},{product_id:21,quantity:1}]},{items:[{product_id:30,quantity:2}]},{history:[{category_id:5}]},{blocked:true}])assert.equal(setup(config).firstDrinkSnacks(alcohol).length,0);
+let c=setup();assert.deepEqual(Array.from(c.firstDrinkSnacks(alcohol),p=>p.id),[25,21]);vm.runInContext('snackNoticeSeen = true',c);assert.equal(c.firstDrinkSnacks(alcohol).length,0);
+for (const config of [{seen:true},{items:[{product_id:30,quantity:1},{product_id:21,quantity:1}]},{blocked:true}])assert.equal(setup(config).firstDrinkSnacks(alcohol).length,0);
 c=setup();assert.equal(c.firstDrinkSnacks({category_id:6}).length,0);assert.equal(c.firstDrinkSnacks(alcohol).length,2);
 assert.deepEqual(Array.from(setup({sold:true}).firstDrinkSnacks(alcohol),p=>p.id),[21]);
-c=setup({storageFails:true});assert.equal(c.firstDrinkSnacks(alcohol).length,2);assert.equal(c.firstDrinkSnacks(alcohol).length,0);
+c=setup({storageFails:true});assert.equal(c.firstDrinkSnacks(alcohol).length,2);vm.runInContext('snackNoticeSeen = true',c);assert.equal(c.firstDrinkSnacks(alcohol).length,0);
 assert.equal(setup({items:[{product_id:30,quantity:1},{product_id:9,quantity:1}]}).firstDrinkSnacks(alcohol).length,2);
-console.log('PASS: first alcohol only; existing snack/alcohol/history suppression; sold-out filtering; topping exclusion; storage failure fallback; syntax');
+console.log('PASS: alcohol only; seen/snack/stopped suppression; sold-out filtering; topping exclusion; storage failure fallback; syntax');
+
+// A skipped offer remains eligible, including old alcohol in cart/history.
+c=setup({blocked:true});assert.equal(c.firstDrinkSnacks(alcohol).length,0);c.orderingMessage=()=>'';assert.equal(c.firstDrinkSnacks(alcohol).length,2);
+c=setup({items:[{product_id:30,quantity:1},{product_id:21,quantity:1}]});assert.equal(c.firstDrinkSnacks(alcohol).length,0);c.cart.pop();assert.equal(c.firstDrinkSnacks(alcohol).length,2);
+for(const config of [{items:[{product_id:30,quantity:2}]},{history:[{category_id:5}]}]) assert.equal(setup(config).firstDrinkSnacks(alcohol).length,2);
+console.log('PASS: skipped offers do not consume eligibility; existing alcohol/history still allows unseen offer');
