@@ -1,0 +1,122 @@
+<div id="v71-left-menu" class="viz-dotted-background">
+  <div class="vl-phone">
+    <header class="vl-header"><img src="https://cdn.jsdelivr.net/gh/machi-order1/machi-order@e9d57e2308f57ffb44ce76328ef0480f15d8c6cb/assets/brand/151-logo-white.webp" alt="博多油そば151"><span>長浜店<br><small>カウンター1番</small></span></header>
+    <div class="vl-layout">
+      <nav class="vl-nav" aria-label="メニューのカテゴリ">
+        <button type="button" class="cursor-interaction" data-category="noodles" aria-pressed="true">油そば</button>
+        <button type="button" class="cursor-interaction" data-category="toppings" aria-pressed="false">トッピング</button>
+        <button type="button" class="cursor-interaction" data-category="sets" aria-pressed="false">セット<br>・ご飯</button>
+        <button type="button" class="cursor-interaction" data-category="sides" aria-pressed="false">単品<br>・おつまみ</button>
+        <button type="button" class="cursor-interaction" data-category="alcohol" aria-pressed="false">アルコール</button>
+        <button type="button" class="cursor-interaction" data-category="soft" aria-pressed="false">ソフト<br>ドリンク</button>
+        <button type="button" class="cursor-interaction" id="vl-takeout">テイク<br>アウト</button>
+      </nav>
+      <div class="vl-products" aria-live="polite">
+        <h2 id="vl-title">油そば</h2>
+        <article class="vl-product"><img id="vl-photo-one" src="https://cdn.jsdelivr.net/gh/machi-order1/machi-order@e9d57e2308f57ffb44ce76328ef0480f15d8c6cb/assets/menu-items/web/hakata-aburasoba.webp" alt="博多油そば"><div class="vl-details"><span id="vl-badge">おすすめ候補</span><h3 id="vl-name-one">博多油そば</h3><div class="vl-price"><b id="vl-price-one">¥1,000</b><button type="button" id="vl-pick-one" class="cursor-interaction">選ぶ</button></div></div></article>
+        <article class="vl-product"><img id="vl-photo-two" src="https://cdn.jsdelivr.net/gh/machi-order1/machi-order@e9d57e2308f57ffb44ce76328ef0480f15d8c6cb/assets/menu-items/web/ebi-shio-aburasoba.webp" alt="えび塩油そば"><div class="vl-details"><h3 id="vl-name-two">えび塩油そば</h3><div class="vl-price"><b id="vl-price-two">¥1,000</b><button type="button" id="vl-pick-two" class="cursor-interaction">選ぶ</button></div></div></article>
+        <p id="vl-selection" hidden></p>
+        <div id="vl-customize" hidden>
+          <h3>麺量を選ぶ</h3>
+          <label class="vl-option"><input type="radio" name="vl-size" value="-200"> 半玉 −¥200</label>
+          <label class="vl-option"><input type="radio" name="vl-size" value="0" checked> 普通 ＋¥0</label>
+          <label class="vl-option"><input type="radio" name="vl-size" value="0"> 大盛 ＋¥0</label>
+          <label class="vl-option"><input type="radio" name="vl-size" value="200"> W玉 ＋¥200</label>
+          <h3>トッピングもいかが？</h3>
+          <label class="vl-option"><input type="checkbox" value="100"> 半熟卵 ＋¥100</label>
+          <label class="vl-option"><input type="checkbox" value="300"> 炙りチャーシュー2枚 ＋¥300</label>
+          <label class="vl-option"><input type="checkbox" value="100"> 自家製高菜 ＋¥100</label>
+          <p class="vl-price"><b id="vl-total" aria-live="polite">合計 ¥1,000</b></p>
+          <button type="button" id="vl-back">メニューに戻る</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+#v71-left-menu .vl-phone{max-width:430px;width:100%;margin:auto;background:#fffaf8;color:#251c19;border:1px solid #eadbd7;border-radius:20px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
+#v71-left-menu .vl-phone *{box-sizing:border-box}
+#v71-left-menu .vl-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px;background:#ce2028;color:#fff}
+#v71-left-menu .vl-header img{width:115px;height:auto}
+#v71-left-menu .vl-header span{text-align:right;font-size:14px;font-weight:700}
+#v71-left-menu .vl-header small{font-size:12px;font-weight:400}
+#v71-left-menu .vl-layout{display:grid;grid-template-columns:86px minmax(0,1fr);gap:10px;padding:12px 10px 16px 6px;align-items:start;min-height:690px}
+#v71-left-menu .vl-nav{display:flex;flex-direction:column;gap:6px;position:sticky;top:8px}
+#v71-left-menu .vl-nav button{font:inherit;min-height:52px;padding:10px 4px;border:1px solid #efd7d1;border-radius:10px;background:white;color:#69524c;font-size:12px;font-weight:700;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+#v71-left-menu #vl-takeout{margin-top:12px;border:2px solid #ce2028;background:#fff0e3;color:#9b2525}
+#v71-left-menu .vl-option{display:block;padding:12px 8px;margin:6px 0;border:1px solid #eadbd7;border-radius:8px;background:#fff;font-size:13px;line-height:1.5}
+#v71-left-menu #vl-back{padding:12px;border:1px solid #ce2028;border-radius:8px;background:white;color:#ce2028;font:inherit;width:100%}
+#v71-left-menu .vl-nav button[aria-pressed="true"]{background:#ce2028;color:white;border-color:#ce2028;box-shadow:inset 4px 0 0 #ffb6ad}
+#v71-left-menu .vl-products{min-width:0}
+#v71-left-menu h2{font-size:20px;font-weight:800;line-height:1.4;margin:7px 0 15px}
+#v71-left-menu .vl-product{background:white;border:1px solid #eddcd5;border-radius:14px;overflow:hidden;margin-bottom:14px}
+#v71-left-menu .vl-product>img{width:100%;aspect-ratio:1.4;object-fit:cover;display:block}
+#v71-left-menu .vl-details{padding:12px}
+#v71-left-menu #vl-badge{background:#fff0e6;color:#9b341c;display:inline-block;padding:3px 6px;border-radius:5px;font-size:11px}
+#v71-left-menu h3{font-size:17px;font-weight:800;margin:6px 0 12px;line-height:1.5;overflow-wrap:anywhere}
+#v71-left-menu .vl-price{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
+#v71-left-menu .vl-price b{font-size:20px;color:#b71923}
+#v71-left-menu .vl-price button{font:inherit;background:#ce2028;color:white;border:0;border-radius:8px;min-width:62px;min-height:44px;padding:10px;font-size:14px;font-weight:700}
+#v71-left-menu #vl-selection{font-size:13px;line-height:1.6;color:#69524c;margin:0;padding:10px;background:#f5eae4;border-radius:8px}
+#v71-left-menu [hidden]{display:none!important}
+@media(max-width:360px){#v71-left-menu .vl-layout{grid-template-columns:78px minmax(0,1fr);gap:8px;padding-right:8px}#v71-left-menu .vl-details{padding:10px}#v71-left-menu .vl-nav button{font-size:12px}}
+</style>
+<script>
+(() => {
+  const root=document.getElementById('v71-left-menu');
+  const imageBase='https://cdn.jsdelivr.net/gh/machi-order1/machi-order@e9d57e2308f57ffb44ce76328ef0480f15d8c6cb/assets/menu-items/web/';
+  const menu={
+    noodles:{title:'油そば',items:[['博多油そば','¥1,000','hakata-aburasoba'],['えび塩油そば','¥1,000','ebi-shio-aburasoba']]},
+    toppings:{title:'トッピング',items:[['半熟卵','¥100','half-boiled-egg'],['追加 炙りチャーシュー2枚','¥300','extra-chashu']]},
+    sets:{title:'セット・ご飯',items:[['D チャーシュー丼セット','¥400〜','set-d'],['B ごはん水餃子セット','¥400','set-b']]},
+    sides:{title:'単品・おつまみ',items:[['水餃子3個','¥300','dumplings-3'],['おつまみ枝豆','¥300','edamame']]},
+    alcohol:{title:'アルコール',items:[['生ビール','¥600','beer'],['角ハイボール','¥600','highball']]},
+    soft:{title:'ソフトドリンク',items:[['コーラ','¥300','cola'],['ウーロン茶','¥300','oolong-tea']]}
+  };
+  let current='noodles';
+  root.querySelectorAll('[data-category]').forEach(button=>button.addEventListener('click',()=>{
+    current=button.dataset.category;
+    const category=menu[current];
+    root.querySelectorAll('[data-category]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+    root.querySelector('#vl-title').textContent=category.title;
+    ['one','two'].forEach((suffix,i)=>{
+      const [name,price,image]=category.items[i];
+      root.querySelector('#vl-name-'+suffix).textContent=name;
+      root.querySelector('#vl-price-'+suffix).textContent=price;
+      const photo=root.querySelector('#vl-photo-'+suffix);photo.src=imageBase+image+'.webp';photo.alt=name;
+    });
+    root.querySelector('#vl-badge').hidden=current!=='noodles';
+    root.querySelector('#vl-selection').hidden=true;
+    root.querySelector('#vl-customize').hidden=true;
+    root.querySelectorAll('.vl-product').forEach(item=>item.hidden=false);
+  }));
+  ['one','two'].forEach((suffix,i)=>root.querySelector('#vl-pick-'+suffix).addEventListener('click',()=>{
+    const message=root.querySelector('#vl-selection');
+    message.hidden=false;
+    message.textContent=menu[current].items[i][0]+'：画面案のため注文は送信しません。';
+    if(current==='noodles'){
+      root.querySelectorAll('.vl-product').forEach(item=>item.hidden=true);
+      root.querySelector('#vl-title').textContent=menu[current].items[i][0];
+      root.querySelector('#vl-customize').hidden=false;
+      root.querySelectorAll('#vl-customize input[type="checkbox"]').forEach(input=>input.checked=false);
+      root.querySelectorAll('#vl-customize input[type="radio"]')[1].checked=true;
+      updateTotal();
+    }
+  }));
+  function updateTotal(){
+    const size=Number(root.querySelector('#vl-customize input[type="radio"]:checked').value);
+    const extras=[...root.querySelectorAll('#vl-customize input[type="checkbox"]:checked')].reduce((sum,input)=>sum+Number(input.value),0);
+    root.querySelector('#vl-total').textContent='合計 ¥'+(1000+size+extras).toLocaleString('ja-JP');
+  }
+  root.querySelectorAll('#vl-customize input').forEach(input=>input.addEventListener('change',updateTotal));
+  root.querySelector('#vl-back').addEventListener('click',()=>root.querySelector('[data-category="noodles"]').click());
+  root.querySelector('#vl-takeout').addEventListener('click',()=>{
+    root.querySelectorAll('.vl-product').forEach(item=>item.hidden=true);
+    root.querySelector('#vl-customize').hidden=true;
+    root.querySelector('#vl-title').textContent='おうちへのおみやげに';
+    root.querySelectorAll('[data-category]').forEach(button=>button.setAttribute('aria-pressed','false'));
+    const message=root.querySelector('#vl-selection');message.hidden=false;
+    message.textContent='持ち帰り専用メニューへ進みます。現在は長浜店専用・店内とは別注文／別会計です。対象商品と容器代はスタッフへご確認ください。';
+  });
+})();
+</script>
