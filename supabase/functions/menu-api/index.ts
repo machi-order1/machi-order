@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
       const { data: links } = productIds.length ? await sb.from('product_option_groups').select('product_id,option_group_id').in('product_id', productIds) : { data: [] as any[] }
       const groupIds = [...new Set((links || []).map((link: any) => link.option_group_id))]
       const { data: groups } = groupIds.length ? await sb.from('option_groups').select('id,name,required,min_select,max_select').in('id', groupIds) : { data: [] as any[] }
-      const { data: options } = groupIds.length ? await sb.from('options').select('id,option_group_id,name,price_delta,sort_order').in('option_group_id', groupIds).eq('active', true).order('sort_order') : { data: [] as any[] }
+      const { data: options } = groupIds.length ? await sb.from('options').select('id,option_group_id,name,price_delta,sort_order,source_product_id').in('option_group_id', groupIds).eq('active', true).order('sort_order') : { data: [] as any[] }
       const { data: rules } = productIds.length ? await sb.from('price_rules').select('product_id,name,price,start_time,end_time,days_of_week').eq('store_id', store.id).eq('active', true).in('product_id', productIds) : { data: [] as any[] }
 
       const local = new Date(new Date().toLocaleString('en-US', { timeZone: store.timezone || 'Asia/Tokyo' }))
@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
         categories,
         products: menu,
         price_schedules: (rules || []).map((rule: any) => ({ name: rule.name, start_time: rule.start_time, end_time: rule.end_time, days_of_week: rule.days_of_week })),
-        option_groups: (groups || []).map((group: any) => ({ ...group, options: (options || []).filter((option: any) => option.option_group_id === group.id) })),
+        option_groups: (groups || []).map((group: any) => ({ ...group, options: (options || []).filter((option: any) => option.option_group_id === group.id).map((option: any) => ({ ...option, available: !option.source_product_id || (products.some((product: any) => Number(product.id) === Number(option.source_product_id)) && (statusMap.get(option.source_product_id) || 'available') === 'available') })) })),
       })
     }
 

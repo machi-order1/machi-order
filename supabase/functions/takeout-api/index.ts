@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
       const groupIds = [...new Set((links.data || []).map((x) => x.option_group_id))];
       const [groups, options] = await Promise.all([
         groupIds.length ? sb.from("option_groups").select("id,name,required,min_select,max_select").in("id", groupIds) : Promise.resolve({ data: [], error: null }),
-        groupIds.length ? sb.from("options").select("id,option_group_id,name,price_delta,sort_order").in("option_group_id", groupIds).eq("active", true).order("sort_order") : Promise.resolve({ data: [], error: null })
+        groupIds.length ? sb.from("options").select("id,option_group_id,name,price_delta,sort_order,source_product_id").in("option_group_id", groupIds).eq("active", true).order("sort_order") : Promise.resolve({ data: [], error: null })
       ]);
       if (groups.error || options.error) throw groups.error || options.error;
       const alcoholCategoryIds = new Set((cats.data || []).filter((c) => String(c.name).includes("アルコール")).map((c) => Number(c.id)));
@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
           sale_status: statusMap.get(Number(p.id)) || "available",
           option_group_ids: (links.data || []).filter((x) => Number(x.product_id) === Number(p.id)).map((x) => x.option_group_id)
         })),
-        option_groups: (groups.data || []).map((g) => ({ ...g, options: (options.data || []).filter((o) => Number(o.option_group_id) === Number(g.id)) }))
+        option_groups: (groups.data || []).map((g) => ({ ...g, options: (options.data || []).filter((o) => Number(o.option_group_id) === Number(g.id)).map((o) => ({ ...o, available: !o.source_product_id || (takeoutProducts.some((p) => Number(p.id) === Number(o.source_product_id)) && (statusMap.get(Number(o.source_product_id)) || 'available') === 'available') })) }))
       }, origin);
     }
 
