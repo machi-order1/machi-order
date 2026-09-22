@@ -18,7 +18,7 @@
 }
 .customer-menu-layout > .tabs .tab {
   width: 100%;
-  min-height: 60px;
+  min-height: 52px;
   padding: 10px 5px;
   border-radius: 10px;
   white-space: normal;
@@ -28,6 +28,18 @@
 }
 .customer-menu-layout > .tabs .tab.active {
   box-shadow: inset 4px 0 0 #ffb6ad;
+}
+.customer-menu-layout > .tabs .takeout-tab {
+  margin-top: 12px;
+  border: 2px solid var(--brand-dark);
+  background: #fff0e3;
+}
+.takeout-link { display: block; text-align: center; text-decoration: none; }
+.topping-picker { margin: 20px 0; border-top: 1px solid #efd7d1; }
+.topping-picker .choice { white-space: normal; overflow-wrap: anywhere; }
+.topping-picker .choice:disabled { opacity: .5; }
+@media (max-height: 620px) {
+  .customer-menu-layout > .tabs { max-height: calc(100dvh - 105px); overflow-y: auto; }
 }
 .customer-menu-layout > #menu { min-width: 0; }
 .customer-menu-layout #menu > section { scroll-margin-top: 12px; }
