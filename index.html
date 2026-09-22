@@ -343,6 +343,11 @@
       $('modal').querySelector('.product-scroll').scrollTop = top;
       const strip = $('modal').querySelector('.topping-strip');
       if (strip) strip.scrollLeft = left;
+      const ingredient = $('modal').querySelector('.ingredient-options');
+      if (ingredient) {
+        $('modal').querySelector('.product-actions').insertAdjacentHTML('beforebegin', '<button type="button" class="ingredient-jump">ネギ・キクラゲ・高菜の量／抜きを選ぶ <span aria-hidden="true">↓</span></button>');
+        $('modal').querySelector('.ingredient-jump').onclick = () => ingredient.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       $('add-item').onclick = addItem;
       $('close-modal').onclick = closeModal;
     }
