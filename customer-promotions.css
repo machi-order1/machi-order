@@ -23,3 +23,6 @@
 .happy-offer.is-pinned .happy-heading { margin-bottom: 4px; }
 .happy-offer.is-pinned .happy-end { padding: 3px 6px; }
 .customer-menu-layout > .tabs { top: calc(var(--pinned-offer-height, 0px) + 8px); max-height: calc(100dvh - 112px - var(--pinned-offer-height, 0px)); }
+
+.customer-menu-layout > .tabs .refill-tab { border-color: #bd2027; font-weight: 850; }
+.customer-menu-layout > .tabs .checkout-guide-tab { margin-top: 8px; background: #f4efec; color: #64514a; border-color: #dfd4ce; }
