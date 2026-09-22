@@ -1,0 +1,64 @@
+<div id="v71-rh" class="viz-dotted-background">
+<div class="rh-phone">
+<div class="rh-offer"><small>HAPPY HOUR · 開催中の表示例</small><h2>まずは、お得な一杯から。</h2><p>22:00まで · お酒だけのご注文もどうぞ</p><div class="rh-drinks">
+<button type="button" data-price="400" data-drink="生ビール"><strong>生ビール</strong><s>通常 ¥600</s><b>¥400</b><span>カートに追加</span></button>
+<button type="button" data-price="200" data-drink="角ハイボール"><strong>角ハイボール</strong><s>通常 ¥600</s><b>¥200</b><span>カートに追加</span></button>
+<button type="button" data-price="200" data-drink="レモンサワー"><strong>レモンサワー</strong><s>通常 ¥500</s><b>¥200</b><span>カートに追加</span></button>
+</div></div>
+<header>博多油そば151 <small>長浜店</small></header>
+<div class="rh-layout"><nav aria-label="商品カテゴリ">
+<button type="button" data-category="recommended" aria-pressed="true">おすすめ</button>
+<button type="button" data-category="noodles" aria-pressed="false">油そば</button>
+<button type="button" data-category="toppings" aria-pressed="false">トッピング</button>
+<button type="button" data-category="sets" aria-pressed="false">セット<br>・ご飯</button>
+<button type="button" data-category="sides" aria-pressed="false">単品<br>・おつまみ</button>
+<button type="button" data-category="alcohol" aria-pressed="false">アルコール</button>
+<button type="button" data-category="soft" aria-pressed="false">ソフト<br>ドリンク</button>
+<button type="button" data-category="takeout" aria-pressed="false">テイク<br>アウト</button>
+</nav><div class="rh-products"><h3 id="rh-title">おすすめ</h3><div id="rh-items"></div><p id="rh-message" aria-live="polite"></p></div></div>
+<footer aria-live="polite"><span id="rh-count">カート 0点</span><b id="rh-total">¥0</b><button type="button" id="rh-cart">内容を確認</button></footer>
+</div></div>
+<style>
+#v71-rh .rh-phone{max-width:430px;margin:auto;background:#fffaf8;color:#281d18;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;border:1px solid #eadbd7;border-radius:18px;overflow:hidden}
+#v71-rh .rh-phone *{box-sizing:border-box}
+#v71-rh .rh-offer{padding:16px 10px;background:#ffdc55;color:#681514}
+#v71-rh .rh-offer small{font-size:11px;letter-spacing:.06em;font-weight:700}
+#v71-rh h2{font-size:22px;margin:6px 0;font-weight:800;line-height:1.4}
+#v71-rh .rh-offer p{font-size:12px;margin:5px 0 12px}
+#v71-rh .rh-drinks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#v71-rh .rh-drinks button{border:0;border-radius:10px;background:#fffaf0;color:#681514;padding:10px 5px;display:flex;flex-direction:column;align-items:center;font:inherit;min-width:0}
+#v71-rh .rh-drinks strong{font-size:12px;min-height:34px}
+#v71-rh .rh-drinks s{font-size:11px;color:#725a47}
+#v71-rh .rh-drinks b{font-size:24px;padding:4px 0;color:#b21923}
+#v71-rh .rh-drinks span{font-size:11px;background:#bf1c25;color:white;padding:12px 4px;border-radius:6px;width:100%;margin-top:5px}
+#v71-rh header{padding:16px;background:#ce2028;color:white;font-size:18px;font-weight:800}
+#v71-rh header small{float:right;font-size:12px}
+#v71-rh .rh-layout{display:grid;grid-template-columns:80px minmax(0,1fr);gap:10px;padding:12px 10px 16px 6px;align-items:start}
+#v71-rh nav{display:flex;flex-direction:column;gap:6px;position:sticky;top:8px}
+#v71-rh nav button{font:inherit;font-size:12px;font-weight:700;background:white;color:#795449;min-height:48px;border:1px solid #ecd5cc;border-radius:8px;padding:9px 3px;overflow-wrap:anywhere}
+#v71-rh nav button[aria-pressed="true"]{background:#ce2028;color:white;border-color:#ce2028}
+#v71-rh nav button:last-child{margin-top:8px;border:2px solid #ce2028;background:#fff0e3;color:#a52127}
+#v71-rh .rh-products{min-width:0}#v71-rh h3{font-size:20px;font-weight:800;margin:5px 0 12px}
+#v71-rh article{background:white;border:1px solid #eadbd7;border-radius:12px;overflow:hidden;margin-bottom:12px}
+#v71-rh article img{width:100%;aspect-ratio:1.5;object-fit:cover;display:block}
+#v71-rh article>div{padding:10px}#v71-rh article h4{font-size:15px;margin:0 0 10px;line-height:1.5;font-weight:800}
+#v71-rh article p{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin:0}#v71-rh article b{font-size:19px;color:#b21923}
+#v71-rh article button,#v71-rh footer button{font:inherit;background:#ce2028;color:white;border:0;border-radius:7px;min-height:44px;padding:10px;font-size:12px;font-weight:700}
+#v71-rh #rh-message{font-size:12px;line-height:1.6}
+#v71-rh footer{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:12px;background:#281d18;color:white;font-size:13px}
+</style>
+<script>
+(() => {
+ const root=document.getElementById('v71-rh');
+ const base='https://cdn.jsdelivr.net/gh/machi-order1/machi-order@e9d57e2308f57ffb44ce76328ef0480f15d8c6cb/assets/menu-items/web/';
+ const recommendations=[['チャーシュー博多油そば',1300,'chashu-hakata'],['チャーシューえび塩油そば',1300,'chashu-ebi-shio'],['A ごはんセット',300,'set-a'],['E チャーシュー丼餃子セット',600,'set-e']];
+ const categories={recommended:['おすすめ',recommendations],noodles:['油そば',recommendations.slice(0,2)],toppings:['トッピング',[['半熟卵',100,'half-boiled-egg']]],sets:['セット・ご飯',recommendations.slice(2)],sides:['単品・おつまみ',[['水餃子3個',300,'dumplings-3']]],alcohol:['アルコール',[['生ビール',400,'beer'],['角ハイボール',200,'highball'],['レモンサワー',200,'lemon-sour']]],soft:['ソフトドリンク',[['コーラ',300,'cola']]],takeout:['テイクアウト',[]]};
+ let count=0,total=0;const cart=[];
+ function render(key){const [title,items]=categories[key];root.querySelector('#rh-title').textContent=title;root.querySelector('#rh-items').innerHTML=items.map(([name,price,photo])=>'<article><img src="'+base+photo+'.webp" alt="'+name+'"><div><h4>'+name+'</h4><p><b>¥'+price.toLocaleString('ja-JP')+'</b><button type="button" data-item="'+name+'">選ぶ</button></p></div></article>').join('');root.querySelector('#rh-message').textContent=key==='takeout'?'長浜店の持ち帰り専用メニューへ進みます。店内とは別注文・別会計です。':'';root.querySelectorAll('[data-category]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.category===key)));}
+ root.querySelectorAll('[data-category]').forEach(button=>button.addEventListener('click',()=>render(button.dataset.category)));
+ root.querySelectorAll('[data-drink]').forEach(button=>button.addEventListener('click',()=>{count++;total+=Number(button.dataset.price);cart.push(button.dataset.drink);root.querySelector('#rh-count').textContent='カート '+count+'点';root.querySelector('#rh-total').textContent='¥'+total.toLocaleString('ja-JP');}));
+ root.addEventListener('click',event=>{const button=event.target.closest('[data-item]');if(button)root.querySelector('#rh-message').textContent=button.dataset.item+'の商品選択画面へ進みます。画面案のため注文は送信しません。';});
+ root.querySelector('#rh-cart').addEventListener('click',()=>{root.querySelector('#rh-message').textContent=cart.length?cart.join('・')+'：合計¥'+total.toLocaleString('ja-JP')+'。実際の画面では内容を確認して注文します。':'商品を選んでください。';});
+ render('recommended');
+})();
+</script>
