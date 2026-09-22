@@ -16,6 +16,7 @@
   <script src="/customer-promotions.js"></script>
   <link rel="stylesheet" href="/customer-promotions.css">
   <script src="/customer-options.js"></script>
+  <script src="/customer-refill.js"></script>
 </head>
 <body>
   <div id="net" class="net hidden">オフライン</div>
@@ -68,6 +69,15 @@
     let selected = {};
     let quantity = 1;
     let sending = false;
+    const refillKey = `machi_refill_v71:${seatToken}:${orderChannel}`;
+    let refillHistory = [];
+    try { refillHistory = CustomerRefill.restore(sessionStorage.getItem(refillKey)); } catch {}
+    function rememberOrderedItems(items) {
+      try {
+        refillHistory = CustomerRefill.remember(refillHistory, items, data);
+        sessionStorage.setItem(refillKey, JSON.stringify(refillHistory));
+      } catch {} // A storage failure must not turn a successful order into a retry.
+    }
 
     function restoreCart() {
       try {
@@ -199,10 +209,43 @@
       };
     }
 
-    function showRefill() {
-      const categories = displayCategories().filter(c => ['アルコール', 'ソフトドリンク'].includes(c.name));
+    async function showRefill() {
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet"><h2>おかわりはいかがですか？</h2><p>飲みたいものを選んで、カートからご注文ください。</p>${categories.map(c => `<button type="button" class="choice" data-refill-category="${Number(c.id)}">${Machi.escapeHtml(c.name)}を見る →</button>`).join('')}<button type="button" id="close-modal" class="choice">メニューへ戻る</button></div>`;
+      $('modal').innerHTML = '<div class="sheet"><div id="refill-loading">最新のメニューを確認しています…</div><button id="close-modal" class="choice">閉じる</button></div>';
+      $('close-modal').onclick = closeModal;
+      const loading = $('refill-loading');
+      try {
+        const latest = await Machi.api('menu-api', { params: { t: seatToken }, token: '' });
+        if (!loading.isConnected) return;
+        data = latest;
+        renderMenu();
+        renderRefill();
+      } catch {
+        if (!loading.isConnected) return;
+        loading.textContent = 'メニューを確認できませんでした。通信状態を確認してもう一度お試しください。';
+        loading.insertAdjacentHTML('afterend', '<button id="refill-retry" class="choice">もう一度確認する</button>');
+        $('refill-retry').onclick = showRefill;
+      }
+    }
+    function renderRefill() {
+      refillHistory = CustomerRefill.restore(JSON.stringify(refillHistory));
+      const rows = CustomerRefill.entries(refillHistory, data);
+      const categories = displayCategories();
+      const rank = ['アルコール','ソフトドリンク','油そば','セット・ご飯','単品・おつまみ'];
+      const links = rank.map(name => categories.find(c => c.name === name || (name === '単品・おつまみ' && c.name === '単品'))).filter(Boolean);
+      $('modal').innerHTML = `<div class="sheet"><h2>おかわり</h2>${rows.length ? '<p class="desc">この画面で注文した商品です。価格は現在の価格です。</p>' + rows.map((row,index) => `<article class="refill-item"><div><b>${Machi.escapeHtml(row.name)}</b><p class="desc">${row.option_names.map(Machi.escapeHtml).join(' ／ ') || '変更なし'}</p><strong>${row.price === null ? '' : Machi.yen(row.price)}</strong></div><button type="button" class="mini" data-repeat="${index}" ${!row.available || orderingMessage() ? 'disabled' : ''}>${!row.available ? '現在注文できません' : row.needsReview ? '内容を選び直す' : '1点追加'}</button></article>`).join('') + '<h3>ほかの商品を見る</h3>' : '<p class="desc">まずはお好きな商品をお選びください。</p>'}${links.map(c => `<button type="button" class="choice" data-refill-category="${Number(c.id)}">${Machi.escapeHtml(c.name)}を見る →</button>`).join('')}<button id="close-modal" class="choice">メニューへ戻る</button></div>`;
+      $('modal').querySelectorAll('[data-repeat]').forEach(button => button.onclick = () => {
+        const row = rows[Number(button.dataset.repeat)];
+        if (!row.available || orderingMessage()) return;
+        current = data.products.find(p => Number(p.id) === Number(row.product_id));
+        editingItem = null;
+        selected = CustomerRefill.selection(current, row.option_ids, data);
+        quantity = 1;
+        if (row.needsReview) {
+          drawProduct();
+          $('modal').querySelector('.product-scroll').insertAdjacentHTML('afterbegin', '<div class="cart-edit-note">前回の選択肢に変更があります。内容を確認して選び直してください。</div>');
+        } else { button.disabled = true; addItem(); }
+      });
       $('modal').querySelectorAll('[data-refill-category]').forEach(button => button.onclick = () => { closeModal(); goCategory(Number(button.dataset.refillCategory)); });
       $('close-modal').onclick = closeModal;
     }
@@ -466,12 +509,14 @@
       button.disabled = true;
       button.textContent = '送信中…';
       const requestId = Machi.createId('customer');
+      const orderedItems = cart.map(item => ({ ...item, option_ids: [...(item.option_ids || [])], option_names: [...(item.option_names || [])] }));
       localStorage.setItem(pendingKey, JSON.stringify({ request_id: requestId, created_at: new Date().toISOString(), items: cart }));
       try {
         const payload = { token: seatToken, table_id: data.table_id, request_id: requestId, items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, option_ids: item.option_ids })) };
         const result = orderChannel === 'staff'
           ? await Machi.api('staff-order-api', { method: 'POST', body: payload })
           : await Machi.api('menu-api', { method: 'POST', token: '', body: payload });
+        rememberOrderedItems(orderedItems);
         pinAlcoholAfterOrder(cart);
         localStorage.removeItem(pendingKey);
         cart = [];

@@ -1,0 +1,37 @@
+import fs from 'node:fs/promises';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const context = { window: {} }; vm.createContext(context);
+vm.runInContext(await fs.readFile(new URL('../customer-refill.js', import.meta.url), 'utf8'), context);
+const api = context.window.CustomerRefill;
+const data = { products: [1,2,3,5,6].map((category_id,index) => ({ id:index+1,category_id,name:'商品'+category_id,price:500,sale_status:'available',option_group_ids:category_id===1?[1]:[] })), option_groups:[{id:1,required:true,min_select:1,max_select:1,options:[{id:11,name:'普通',price_delta:0},{id:12,name:'W玉',price_delta:200}]}] };
+const items = data.products.map(p => ({ product_id:p.id,name:p.name,quantity:2,option_ids:p.category_id===1?[11]:[],option_names:p.category_id===1?['普通']:[] }));
+let history = api.remember([],items,data,1000);
+assert.deepEqual(Array.from(api.entries(history,data),r=>r.category_id),[5,6,3,2,1]);
+history = api.remember(history,[{...items[0],option_ids:[12],option_names:['W玉']}],data,1100);
+assert.equal(history.length,6,'different bowl options stay separate');
+history = api.remember(history,[items[0]],data,1200);
+assert.equal(history.length,6,'same configuration deduplicates');
+let rows = api.entries(history,data);
+assert.equal(rows.find(r=>r.option_ids.includes(12)).price,700);
+data.products[3].price=600;
+assert.equal(api.entries(history,data).find(r=>r.category_id===5).price,600,'current price replaces happy-hour history price');
+data.products[3].sale_status='sold_out';
+assert.equal(api.entries(history,data).find(r=>r.category_id===5).available,false);
+data.option_groups[0].options[1].available=false;
+assert.equal(api.entries(history,data).find(r=>r.option_ids.includes(12)).needsReview,true);
+assert.equal(api.entries(history,data).find(r=>r.option_ids.includes(12)).price,null);
+assert.equal(api.restore(JSON.stringify(history), 13*60*60*1000).length,0);
+assert.equal(api.restore('bad json').length,0);
+const html = await fs.readFile(new URL('../index.html',import.meta.url),'utf8');
+const orderSource = html.slice(html.indexOf('    async function order()'),html.indexOf('    function showSuccess('));
+async function submit(fail=false,testMode=false) {
+  const saved=[];
+  const c={cart:[items[0]],sending:false,testMode,navigator:{onLine:true},orderingMessage:()=>'',confirm:()=>true,localStorage:{getItem:()=>null,setItem(){},removeItem(){}},pendingKey:'pending',seatToken:'test',data:{table_id:1},orderChannel:'qr',$:()=>({}),Machi:{createId:()=> 'id',api:async()=>{if(fail)throw Error('network');return {order_id:1}}},rememberOrderedItems:items=>saved.push(items),pinAlcoholAfterOrder(){},saveCart(){},updateCart(){},showSuccess(){},showAmbiguousFailure(){},showPendingWarning(){}};
+  vm.createContext(c);vm.runInContext(orderSource,c);await c.order();return saved;
+}
+assert.equal((await submit()).length,1);
+assert.equal((await submit(true)).length,0,'failed/ambiguous order is not remembered');
+assert.equal((await submit(false,true)).length,0,'preview is not remembered');
+assert.match(html,/アルコール','ソフトドリンク','油そば','セット・ご飯','単品・おつまみ/);
+console.log('PASS: refill rank, option identity, deduplication, current price, unavailable options, expiry, success-only history, empty-history category order.');
