@@ -64,6 +64,7 @@
     let data = null;
     let cart = restoreCart();
     let current = null;
+    let editingItem = null;
     let selected = {};
     let quantity = 1;
     let sending = false;
@@ -283,6 +284,7 @@
     }
 
     function pick(id) {
+      editingItem = null;
       current = data.products.find((product) => Number(product.id) === id);
       if (!current) return;
       if (isTopping(current)) return showToppingTargets(current);
@@ -336,14 +338,53 @@
       else cart[index] = changed;
       saveCart(); updateCart(); showCart();
     }
+
+    function editCartItem(index) {
+      const item = cart[index];
+      const product = data.products.find(value => Number(value.id) === Number(item?.product_id));
+      if (!item || !product || product.sale_status !== 'available') return alert('この商品は現在変更できません。カートから削除して別の商品をお選びください。');
+      current = product;
+      const groups = productGroups(product);
+      const ids = (item.option_ids || []).map(Number);
+      selected = Object.fromEntries(groups.map(group => [group.id, ids.filter(id => (group.options || []).some(option => Number(option.id) === id && option.available !== false))]));
+      editingItem = { index, original: item, optionsChanged: ids.some(id => !Object.values(selected).flat().includes(id)) };
+      quantity = 1;
+      drawProduct();
+    }
+    function editedCartLines(items, index, changed) {
+      const original = items[index];
+      if (!original || Number(original.product_id) !== Number(changed.product_id) ||
+          !Number.isInteger(changed.quantity) || changed.quantity < 1 || changed.quantity > Number(original.quantity)) throw new Error('変更する数量を確認してください');
+      const same = Number(original.price) === Number(changed.price) &&
+        JSON.stringify((original.option_ids || []).map(Number).sort((a,b) => a-b)) === JSON.stringify((changed.option_ids || []).map(Number).sort((a,b) => a-b));
+      if (same) return items.map((item,i) => i === index ? { ...changed, quantity: Number(original.quantity) } : item);
+      const result = [...items];
+      const remaining = Number(original.quantity) - changed.quantity;
+      result.splice(index, 1, ...(remaining ? [{ ...original, quantity: remaining }, changed] : [changed]));
+      return result;
+    }
+    function saveEditedItem() {
+      const edit = editingItem;
+      if (!edit || cart[edit.index] !== edit.original) return showCart();
+      if (current.sale_status !== 'available') return alert('この商品は現在変更できません。');
+      const error = CustomerOptions.validate(productGroups(current), selected);
+      if (error) return alert(error);
+      const optionIds = Object.values(selected).flat();
+      const changed = { ...edit.original, quantity, option_ids: optionIds, option_names: optionDetails(optionIds).map(option => option.name), name: current.name, price: Number(current.price) + optionDelta() };
+      try { cart = editedCartLines(cart, edit.index, changed); }
+      catch (error) { return alert(error.message); }
+      saveCart();
+      updateCart();
+      showCart();
+    }
     function drawProduct() {
       const top = $('modal').querySelector('.product-scroll')?.scrollTop || 0;
       const left = $('modal').querySelector('.topping-strip')?.scrollLeft || 0;
       const unit = Number(current.price) + optionDelta();
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet product-sheet"><div class="product-heading"><h2>${Machi.escapeHtml(current.name)}</h2><button id="close-modal" class="product-dismiss" aria-label="商品選択を閉じる">×</button></div><div class="product-scroll">${CustomerOptions.render(productGroups(current), selected, Machi.escapeHtml, Machi.yen)}<p class="desc">変更内容はこの一杯に反映します。数量を増やすとすべて同じ内容です。内容を変える場合は別々に追加してください。</p></div><div class="product-actions"><div class="qtyrow" aria-label="数量"><button class="mini" data-qty="-1" aria-label="数量を減らす">−</button><b>${quantity}</b><button class="mini" data-qty="1" aria-label="数量を増やす">＋</button></div><button id="add-item" class="order product-add"><span>${Machi.yen(unit * quantity)}</span><span>カートに追加</span></button></div></div>`;
+      $('modal').innerHTML = `<div class="sheet product-sheet"><div class="product-heading"><h2>${Machi.escapeHtml(current.name)}</h2><button id="close-modal" class="product-dismiss" aria-label="${editingItem ? '変更を保存せずカートに戻る' : '商品選択を閉じる'}">×</button></div><div class="product-scroll">${editingItem ? `<div class="cart-edit-note">カート内 ${Number(editingItem.original.quantity)}点のうち、下の数量分を変更します。残りは元の内容で残ります。${editingItem.optionsChanged ? '<br>選択肢が更新されています。内容を確認して選び直してください。' : ''}</div>` : ''}${CustomerOptions.render(productGroups(current), selected, Machi.escapeHtml, Machi.yen)}<p class="desc">変更内容はこの一杯に反映します。数量を増やすとすべて同じ内容です。内容を変える場合は別々に追加してください。</p></div><div class="product-actions"><div class="qtyrow" aria-label="${editingItem ? '変更する数量' : '数量'}"><button class="mini" data-qty="-1" aria-label="数量を減らす">−</button><b>${quantity}</b><button class="mini" data-qty="1" aria-label="数量を増やす">＋</button></div><button id="add-item" class="order product-add"><span>${Machi.yen(unit * quantity)}</span><span>${editingItem ? quantity + '点の変更を保存' : 'カートに追加'}</span></button></div></div>`;
       document.querySelectorAll('[data-group]').forEach((button) => button.onclick = () => toggleOption(Number(button.dataset.group), Number(button.dataset.option), Number(button.dataset.max)));
-      document.querySelectorAll('[data-qty]').forEach((button) => button.onclick = () => { quantity = Math.max(1, Math.min(20, quantity + Number(button.dataset.qty))); drawProduct(); });
+      document.querySelectorAll('[data-qty]').forEach((button) => button.onclick = () => { quantity = Math.max(1, Math.min(editingItem ? Number(editingItem.original.quantity) : 20, quantity + Number(button.dataset.qty))); drawProduct(); });
       $('modal').querySelector('.product-scroll').scrollTop = top;
       const strip = $('modal').querySelector('.topping-strip');
       if (strip) strip.scrollLeft = left;
@@ -352,8 +393,12 @@
         $('modal').querySelector('.product-actions').insertAdjacentHTML('beforebegin', '<button type="button" class="ingredient-jump">ネギ・キクラゲ・高菜の量／抜きを選ぶ <span aria-hidden="true">↓</span></button>');
         $('modal').querySelector('.ingredient-jump').onclick = () => ingredient.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+      if (editingItem) {
+        $('modal').querySelector('[data-qty="-1"]').disabled = quantity <= 1;
+        $('modal').querySelector('[data-qty="1"]').disabled = quantity >= Number(editingItem.original.quantity);
+      }
       $('add-item').onclick = addItem;
-      $('close-modal').onclick = closeModal;
+      $('close-modal').onclick = editingItem ? showCart : closeModal;
     }
     function toggleOption(groupId, optionId) {
       const top = $('modal').querySelector('.product-scroll').scrollTop;
@@ -365,6 +410,7 @@
       if (strip) strip.scrollLeft = left;
     }
     function addItem() {
+      if (editingItem) return saveEditedItem();
       const error = CustomerOptions.validate(productGroups(current), selected);
       if (error) return alert(error);
       const optionIds = Object.values(selected).flat();
@@ -395,12 +441,14 @@
       $('sum').textContent = `${count}点　${Machi.yen(total)}`;
     }
     function showCart() {
+      editingItem = null;
       $('added-notice')?.remove();
       const total = cart.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
       $('modal').className = 'modal';
       const stopped = orderingMessage();
-      $('modal').innerHTML = `<div class="sheet"><h2>ご注文内容</h2>${cart.map((item, index) => `<div class="card row"><div><b>${Machi.escapeHtml(item.name)}</b>${item.option_names?.length ? `<div class="desc">${item.option_names.map(Machi.escapeHtml).join(' / ')}</div>` : ''}<div>${item.quantity}点 × ${Machi.yen(item.price)}</div><div class="qtyrow"><button class="mini" data-cart-qty="${index}:-1">−</button><b>${item.quantity}</b><button class="mini" data-cart-qty="${index}:1">＋</button></div></div><button class="mini" data-remove="${index}">削除</button></div>`).join('')}<h2>合計 ${Machi.yen(total)}</h2>${stopped ? `<div class="notice danger">${Machi.escapeHtml(stopped)}</div>` : ''}<button id="send-order" class="order" ${stopped ? 'disabled' : ''}>${stopped ? '現在は注文できません' : 'この内容で注文する'}</button><button id="close-modal" class="choice">戻る</button></div>`;
+      $('modal').innerHTML = `<div class="sheet"><h2>ご注文内容</h2>${cart.map((item, index) => `<div class="card row"><div><b>${Machi.escapeHtml(item.name)}</b>${item.option_names?.length ? `<div class="desc">${item.option_names.map(Machi.escapeHtml).join(' / ')}</div>` : ''}<div>${item.quantity}点 × ${Machi.yen(item.price)}</div><div class="qtyrow"><button class="mini" data-cart-qty="${index}:-1">−</button><b>${item.quantity}</b><button class="mini" data-cart-qty="${index}:1">＋</button></div></div><div class="cart-line-actions"><button type="button" class="mini cart-edit-button" data-edit="${index}">変更</button><button class="mini" data-remove="${index}">削除</button></div></div>`).join('')}<h2>合計 ${Machi.yen(total)}</h2>${stopped ? `<div class="notice danger">${Machi.escapeHtml(stopped)}</div>` : ''}<button id="send-order" class="order" ${stopped ? 'disabled' : ''}>${stopped ? '現在は注文できません' : 'この内容で注文する'}</button><button id="close-modal" class="choice">戻る</button></div>`;
       document.querySelectorAll('[data-cart-qty]').forEach((button) => button.onclick = () => { const [index, delta] = button.dataset.cartQty.split(':').map(Number); cart[index].quantity = Math.max(0, Number(cart[index].quantity) + delta); if (!cart[index].quantity) cart.splice(index, 1); saveCart(); updateCart(); showCart(); });
+      document.querySelectorAll('[data-edit]').forEach(button => button.onclick = () => editCartItem(Number(button.dataset.edit)));
       document.querySelectorAll('[data-remove]').forEach((button) => button.onclick = () => { cart.splice(Number(button.dataset.remove), 1); saveCart(); updateCart(); showCart(); });
       $('send-order').onclick = order;
       $('close-modal').onclick = closeModal;
@@ -449,7 +497,7 @@
       if (force) alert('直前の注文が厨房へ届いている可能性があります。店員に確認してください。');
       $('menu').insertAdjacentHTML('afterbegin', '<div class="notice danger"><b>直前の注文を確認中です。</b><br>二重送信を防ぐため、店員へお声がけください。</div>');
     }
-    function closeModal() { $('modal').className = 'hidden'; $('modal').innerHTML = ''; }
+    function closeModal() { editingItem = null; $('modal').className = 'hidden'; $('modal').innerHTML = ''; }
     $('open-cart').onclick = showCart;
     load().catch((error) => {
       $('brand').textContent = '読み込みできませんでした';
