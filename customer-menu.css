@@ -169,3 +169,8 @@
 .added-notice p { flex: 1; margin: 0; font-size: 12px; }
 .added-review { flex: 0 0 auto; min-height: 36px; padding: 4px; border: 0; background: transparent; color: #92222a; text-decoration: underline; font-size: 12px; }
 .added-dismiss { flex: 0 0 32px; min-height: 36px; border: 0; background: transparent; color: #85291d; font-size: 22px; }
+
+.cart-line-actions { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; }
+.cart-line-actions .cart-edit-button { background: #fff; border-color: #d9141f; min-height: 44px; }
+.cart-edit-note { margin: 12px 0; padding: 10px 12px; border-radius: 10px; background: #fff0dc; color: #694638; font-size: 12px; line-height: 1.6; }
+.product-actions button:disabled { opacity: .4; }
