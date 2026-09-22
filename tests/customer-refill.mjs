@@ -28,7 +28,7 @@ const orderSource = html.slice(html.indexOf('    async function order()'),html.i
 async function submit(fail=false,testMode=false) {
   const saved=[];
   const c={cart:[items[0]],sending:false,testMode,navigator:{onLine:true},orderingMessage:()=>'',confirm:()=>true,localStorage:{getItem:()=>null,setItem(){},removeItem(){}},pendingKey:'pending',seatToken:'test',data:{table_id:1},orderChannel:'qr',$:()=>({}),Machi:{createId:()=> 'id',api:async()=>{if(fail)throw Error('network');return {order_id:1}}},rememberOrderedItems:items=>saved.push(items),pinAlcoholAfterOrder(){},saveCart(){},updateCart(){},showSuccess(){},showAmbiguousFailure(){},showPendingWarning(){}};
-  vm.createContext(c);vm.runInContext(orderSource,c);await c.order();return saved;
+  vm.createContext(c);vm.runInContext(html.slice(html.indexOf('    function orderDestination()'),html.indexOf('    function seatReview()')) + orderSource,c);await c.order();return saved;
 }
 assert.equal((await submit()).length,1);
 assert.equal((await submit(true)).length,0,'failed/ambiguous order is not remembered');
