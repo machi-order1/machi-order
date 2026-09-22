@@ -1,0 +1,74 @@
+<div id="v71-bowl-customizer" class="viz-dotted-background">
+  <div class="bc-phone">
+    <header><strong>この一杯を、お好みに。</strong><span>博多油そば151</span></header>
+    <div class="bc-body">
+      <nav aria-label="変更する油そば"><button type="button" data-bowl="0" aria-pressed="true">博多油そば</button><button type="button" data-bowl="1" aria-pressed="false">えび塩油そば</button></nav>
+      <h3>具材の量</h3>
+      <p class="bc-hint">青ネギと白ネギは別々に選べます。</p>
+      <div class="bc-ingredient" data-ingredient="白ネギ"><b>白ネギ</b><div><button type="button" data-amount="抜き" aria-pressed="false">抜き<br><small>＋¥0</small></button><button type="button" data-amount="通常" aria-pressed="true">通常<br><small>＋¥0</small></button><button type="button" data-amount="大盛り" aria-pressed="false">大盛り<br><small>＋¥100</small></button></div></div>
+      <div class="bc-ingredient" data-ingredient="青ネギ"><b>青ネギ</b><div><button type="button" data-amount="抜き" aria-pressed="false">抜き<br><small>＋¥0</small></button><button type="button" data-amount="通常" aria-pressed="true">通常<br><small>＋¥0</small></button><button type="button" data-amount="大盛り" aria-pressed="false">大盛り<br><small>＋¥100</small></button></div></div>
+      <div class="bc-ingredient" data-ingredient="キクラゲ"><b>キクラゲ</b><div><button type="button" data-amount="抜き" aria-pressed="false">抜き<br><small>＋¥0</small></button><button type="button" data-amount="通常" aria-pressed="true">通常<br><small>＋¥0</small></button><button type="button" data-amount="大盛り" aria-pressed="false">大盛り<br><small>＋¥100</small></button></div></div>
+      <div class="bc-ingredient" data-ingredient="高菜"><b>高菜</b><div><button type="button" data-amount="抜き" aria-pressed="false">抜き<br><small>＋¥0</small></button><button type="button" data-amount="通常" aria-pressed="true">通常<br><small>＋¥0</small></button><button type="button" data-amount="大盛り" aria-pressed="false">大盛り<br><small>＋¥100</small></button></div></div>
+      <h3>追加トッピング</h3>
+      <label class="bc-extra"><input type="checkbox" data-extra="半熟卵追加"><span>半熟卵追加</span><b>＋¥100</b></label>
+      <label class="bc-extra"><input type="checkbox" data-extra="炙りチャーシュー2枚追加"><span>炙りチャーシュー2枚追加</span><b>＋¥300</b></label>
+      <div class="bc-total" aria-live="polite"><span>この一杯の合計</span><b id="bc-total">¥1,000</b></div>
+    </div>
+  </div>
+  <div class="bc-kitchen" aria-live="polite"><h3>厨房での表示イメージ</h3><div id="bc-kitchen-lines"></div></div>
+</div>
+<style>
+#v71-bowl-customizer .bc-phone,#v71-bowl-customizer .bc-kitchen{max-width:430px;width:100%;margin:auto;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;box-sizing:border-box;color:#271d19}
+#v71-bowl-customizer .bc-phone{background:#fffaf8;border:1px solid #eadbd7;border-radius:18px;overflow:hidden}
+#v71-bowl-customizer .bc-phone *{box-sizing:border-box}
+#v71-bowl-customizer header{background:#ce2028;color:#fff;padding:17px;display:grid;gap:5px}
+#v71-bowl-customizer header strong{font-size:20px;font-weight:800}
+#v71-bowl-customizer header span{font-size:12px}
+#v71-bowl-customizer .bc-body{padding:14px}
+#v71-bowl-customizer nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+#v71-bowl-customizer button{font:inherit;border:1px solid #dcc8be;background:white;color:#6b5147;border-radius:9px;padding:10px 5px;min-height:48px;font-size:14px;font-weight:700}
+#v71-bowl-customizer button[aria-pressed="true"]{border:2px solid #ce2028;background:#fff0eb;color:#a51b22}
+#v71-bowl-customizer nav button[aria-pressed="true"]{background:#ce2028;color:white}
+#v71-bowl-customizer h3{font-size:17px;font-weight:800;margin:22px 0 10px}
+#v71-bowl-customizer .bc-hint{font-size:12px;color:#725e55;margin:0 0 14px}
+#v71-bowl-customizer .bc-ingredient{margin:13px 0}
+#v71-bowl-customizer .bc-ingredient>b{display:block;font-size:14px;margin-bottom:6px}
+#v71-bowl-customizer .bc-ingredient>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#v71-bowl-customizer small{font-size:12px;font-weight:400}
+#v71-bowl-customizer .bc-extra{display:flex;align-items:center;gap:8px;padding:13px 8px;border-bottom:1px solid #eadbd7;font-size:13px}
+#v71-bowl-customizer .bc-extra input{width:20px;height:20px;accent-color:#ce2028;flex-shrink:0}
+#v71-bowl-customizer .bc-extra span{flex:1}
+#v71-bowl-customizer .bc-extra b{white-space:nowrap}
+#v71-bowl-customizer .bc-total{margin-top:18px;background:#ce2028;color:#fff;padding:15px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;font-size:14px}
+#v71-bowl-customizer .bc-total b{font-size:24px;font-weight:800}
+#v71-bowl-customizer .bc-kitchen{margin:18px auto 0;padding:4px 16px 14px;background:#f3eee9;border-radius:12px}
+#v71-bowl-customizer .bc-kitchen h3{font-size:15px;margin:12px 0}
+#v71-bowl-customizer .bc-kitchen article{border-top:1px solid #ddcfc5;padding:12px 0}
+#v71-bowl-customizer .bc-kitchen b{font-size:15px}
+#v71-bowl-customizer .bc-kitchen p{font-size:13px;line-height:1.8;margin:6px 0 0}
+#v71-bowl-customizer .bc-kitchen .bc-omit{color:#b31622;font-weight:700}
+</style>
+<script>
+(() => {
+  const root=document.getElementById('v71-bowl-customizer');
+  const names=['博多油そば','えび塩油そば'];
+  const prices={'半熟卵追加':100,'炙りチャーシュー2枚追加':300};
+  const bowls=names.map(()=>({ingredients:{白ネギ:'通常',青ネギ:'通常',キクラゲ:'通常',高菜:'通常'},extras:[]}));
+  let active=0;
+  function total(bowl){return 1000+Object.values(bowl.ingredients).filter(value=>value==='大盛り').length*100+bowl.extras.reduce((sum,name)=>sum+prices[name],0);}
+  function render(){
+    root.querySelectorAll('[data-bowl]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.bowl)===active)));
+    root.querySelectorAll('[data-ingredient]').forEach(row=>row.querySelectorAll('[data-amount]').forEach(button=>button.setAttribute('aria-pressed',String(bowls[active].ingredients[row.dataset.ingredient]===button.dataset.amount))));
+    root.querySelectorAll('[data-extra]').forEach(input=>input.checked=bowls[active].extras.includes(input.dataset.extra));
+    root.querySelector('#bc-total').textContent='¥'+total(bowls[active]).toLocaleString('ja-JP');
+    root.querySelector('#bc-kitchen-lines').innerHTML=bowls.map((bowl,index)=>{
+      const changes=Object.entries(bowl.ingredients).filter(([,value])=>value!=='通常').map(([name,value])=>'<span class="'+(value==='抜き'?'bc-omit':'')+'">'+name+value+'</span>');
+      return '<article><b>'+names[index]+' ×1 · ¥'+total(bowl).toLocaleString('ja-JP')+'</b><p>'+[...changes,...bowl.extras].join(' ／ ')+(!changes.length&&!bowl.extras.length?'通常（変更なし）':'')+'</p></article>';
+    }).join('');
+  }
+  root.querySelectorAll('[data-bowl]').forEach(button=>button.addEventListener('click',()=>{active=Number(button.dataset.bowl);render();}));
+  root.querySelectorAll('[data-ingredient]').forEach(row=>row.querySelectorAll('[data-amount]').forEach(button=>button.addEventListener('click',()=>{bowls[active].ingredients[row.dataset.ingredient]=button.dataset.amount;render();})));
+  root.querySelectorAll('[data-extra]').forEach(input=>input.addEventListener('change',()=>{const name=input.dataset.extra;bowls[active].extras=input.checked?[...bowls[active].extras,name]:bowls[active].extras.filter(value=>value!==name);render();}));
+  render();
+})();
+</script>
