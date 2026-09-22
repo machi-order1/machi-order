@@ -1,0 +1,75 @@
+/* Customer menu only. Keep shared staff, kitchen and checkout styles untouched. */
+.customer-menu-layout {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding-top: 12px;
+}
+.customer-menu-layout > .tabs {
+  flex-direction: column;
+  align-self: start;
+  position: sticky;
+  top: 12px;
+  gap: 6px;
+  padding: 0;
+  overflow: visible;
+  background: var(--paper);
+}
+.customer-menu-layout > .tabs .tab {
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 5px;
+  border-radius: 10px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  font-size: 13px;
+}
+.customer-menu-layout > .tabs .tab.active {
+  box-shadow: inset 4px 0 0 #ffb6ad;
+}
+.customer-menu-layout > #menu { min-width: 0; }
+.customer-menu-layout #menu > section { scroll-margin-top: 12px; }
+.customer-menu-layout #menu > section > h2 { font-size: 21px; margin: 8px 0 14px; }
+.customer-menu-layout #menu .name { overflow-wrap: anywhere; }
+.customer-menu-layout #menu .happy-banner { flex-wrap: wrap; gap: 8px; }
+.customer-menu-layout #menu .happy-banner strong { font-size: 16px; }
+
+@media (max-width: 600px) {
+  .customer-menu-layout {
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 10px;
+    padding-right: 10px;
+    padding-left: 6px;
+  }
+  .customer-menu-layout > .tabs .tab { font-size: 12px; }
+  .customer-menu-layout #menu .card { padding: 0; overflow: hidden; }
+  .customer-menu-layout #menu .card > .row { display: flex; flex-direction: column; gap: 0; align-items: stretch; }
+  .customer-menu-layout #menu .photo {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1.4;
+    border-radius: 0;
+  }
+  .customer-menu-layout #menu .photo img { height: 100%; aspect-ratio: 1.4; }
+  .customer-menu-layout #menu .product { padding: 12px 12px 0; }
+  .customer-menu-layout #menu .pricebox {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px 12px;
+    text-align: left;
+  }
+  .customer-menu-layout #menu .price { font-size: 20px; }
+  .customer-menu-layout #menu .regular-price { flex-basis: 100%; }
+  .customer-menu-layout #menu .add { margin: 0 0 0 auto; min-height: 44px; min-width: 62px; }
+}
+@media (max-width: 360px) {
+  .customer-menu-layout { grid-template-columns: 78px minmax(0, 1fr); gap: 8px; padding-right: 8px; }
+}
+
+.customer-menu-layout > .tabs .takeout-tab {margin-top:12px;border:2px solid var(--brand-dark);background:#fff0e3}
+.takeout-link {display:block;text-align:center;text-decoration:none}
