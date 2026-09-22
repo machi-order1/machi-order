@@ -95,11 +95,14 @@
     const toppingCategoryId = 900001;
     const recommendedCategoryId = 900000;
     function isTopping(product) { return Number(product.category_id) === 3 && toppingIds.has(Number(product.id)); }
+    function availableFirst(products) {
+      return [...products].sort((a, b) => Number(a.sale_status !== 'available') - Number(b.sale_status !== 'available'));
+    }
     function categoryProducts(category) {
-      if (category.id === recommendedCategoryId) return CustomerPromotions.recommendations(data);
-      if (category.id === toppingCategoryId) return (data.products || []).filter(isTopping);
+      if (category.id === recommendedCategoryId) return availableFirst(CustomerPromotions.recommendations(data));
+      if (category.id === toppingCategoryId) return availableFirst((data.products || []).filter(isTopping));
       const ids = (data.categories || []).filter(item => Number(item.id) === Number(category.id) || Number(item.parent_id) === Number(category.id)).map(item => Number(item.id));
-      return (data.products || []).filter(product => ids.includes(Number(product.category_id)) && !isTopping(product));
+      return availableFirst((data.products || []).filter(product => ids.includes(Number(product.category_id)) && !isTopping(product)));
     }
     function displayCategories() {
       const categories = data.categories || [];
@@ -535,13 +538,19 @@
       $('cartbar').classList.toggle('hidden', !count);
       $('sum').textContent = `${count}点　${Machi.yen(total)}`;
     }
+    function orderDestination() {
+      return [data.store, data.table].filter(Boolean).join(' ／ ');
+    }
+    function seatReview() {
+      return `<div class="notice seat-review"><small>お届け先をご確認ください</small><strong>${Machi.escapeHtml(orderDestination())}</strong><span>席が違う場合は、注文せずにお席のQRコードを読み直してください。</span></div>`;
+    }
     function showCart() {
       editingItem = null;
       $('added-notice')?.remove();
       const total = cart.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
       $('modal').className = 'modal';
       const stopped = orderingMessage();
-      $('modal').innerHTML = `<div class="sheet"><h2>ご注文内容</h2>${cart.map((item, index) => `<div class="card row"><div><b>${Machi.escapeHtml(item.name)}</b>${item.option_names?.length ? `<div class="desc">${item.option_names.map(Machi.escapeHtml).join(' / ')}</div>` : ''}<div>${item.quantity}点 × ${Machi.yen(item.price)}</div><div class="qtyrow"><button class="mini" data-cart-qty="${index}:-1">−</button><b>${item.quantity}</b><button class="mini" data-cart-qty="${index}:1">＋</button></div></div><div class="cart-line-actions"><button type="button" class="mini cart-edit-button" data-edit="${index}">変更</button><button class="mini" data-remove="${index}">削除</button></div></div>`).join('')}<h2>合計 ${Machi.yen(total)}</h2>${stopped ? `<div class="notice danger">${Machi.escapeHtml(stopped)}</div>` : ''}<button id="send-order" class="order" ${stopped ? 'disabled' : ''}>${stopped ? '現在は注文できません' : 'この内容で注文する'}</button><button id="close-modal" class="choice">戻る</button></div>`;
+      $('modal').innerHTML = `<div class="sheet"><h2>ご注文内容</h2>${cart.map((item, index) => `<div class="card row"><div><b>${Machi.escapeHtml(item.name)}</b>${item.option_names?.length ? `<div class="desc">${item.option_names.map(Machi.escapeHtml).join(' / ')}</div>` : ''}<div>${item.quantity}点 × ${Machi.yen(item.price)}</div><div class="qtyrow"><button class="mini" data-cart-qty="${index}:-1">−</button><b>${item.quantity}</b><button class="mini" data-cart-qty="${index}:1">＋</button></div></div><div class="cart-line-actions"><button type="button" class="mini cart-edit-button" data-edit="${index}">変更</button><button class="mini" data-remove="${index}">削除</button></div></div>`).join('')}<h2>合計 ${Machi.yen(total)}</h2>${seatReview()}${stopped ? `<div class="notice danger">${Machi.escapeHtml(stopped)}</div>` : ''}<button id="send-order" class="order" ${stopped ? 'disabled' : ''}>${stopped ? '現在は注文できません' : 'この内容で注文する'}</button><button id="close-modal" class="choice">戻る</button></div>`;
       document.querySelectorAll('[data-cart-qty]').forEach((button) => button.onclick = () => { const [index, delta] = button.dataset.cartQty.split(':').map(Number); cart[index].quantity = Math.max(0, Number(cart[index].quantity) + delta); if (!cart[index].quantity) cart.splice(index, 1); saveCart(); updateCart(); showCart(); });
       document.querySelectorAll('[data-edit]').forEach(button => button.onclick = () => editCartItem(Number(button.dataset.edit)));
       document.querySelectorAll('[data-remove]').forEach((button) => button.onclick = () => { cart.splice(Number(button.dataset.remove), 1); saveCart(); updateCart(); showCart(); });
@@ -555,7 +564,7 @@
       if (testMode) return showSuccess({ test: true });
       if (!navigator.onLine) return alert('オフラインです。通信が戻ってから注文してください。');
       if (localStorage.getItem(pendingKey)) return showPendingWarning(true);
-      if (!confirm('この内容で注文を確定しますか？')) return;
+      if (!confirm(`${orderDestination()}へ注文します。\nこの内容で注文を確定しますか？`)) return;
       sending = true;
       const button = $('send-order');
       button.disabled = true;

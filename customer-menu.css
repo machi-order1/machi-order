@@ -210,3 +210,9 @@
 .added-snack-links .photo { width: 44px; height: 44px; border-radius: 7px; font-size: 9px; }
 .added-snack-links b { display: block; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 .added-snack-links button > span > span { display: block; margin-top: 4px; color: #92222a; font-size: 13px; font-weight: 750; }
+
+.seat-review { border: 1px solid #e8cdbb; background: #fff3df; }
+.seat-review > * { display: block; }
+.seat-review small { font-size: 12px; color: #745648; }
+.seat-review strong { margin: 4px 0 6px; font-size: 18px; color: #6e211b; overflow-wrap: anywhere; }
+.seat-review span { font-size: 12px; }
