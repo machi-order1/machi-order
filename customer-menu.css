@@ -174,3 +174,9 @@
 .cart-line-actions .cart-edit-button { background: #fff; border-color: #d9141f; min-height: 44px; }
 .cart-edit-note { margin: 12px 0; padding: 10px 12px; border-radius: 10px; background: #fff0dc; color: #694638; font-size: 12px; line-height: 1.6; }
 .product-actions button:disabled { opacity: .4; }
+
+.refill-item { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #eadbd3; }
+.refill-item > div { flex: 1; min-width: 0; }
+.refill-item .desc { margin: 5px 0; }
+.refill-item button { flex: 0 0 auto; min-height: 44px; max-width: 110px; white-space: normal; }
+.refill-item button:disabled { opacity: .5; }
