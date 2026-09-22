@@ -311,6 +311,7 @@
       });
     }
     function goCategory(id) {
+      $('added-notice')?.remove();
       setActiveCategory(id);
       const target = $(`c${id}`);
       const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -345,6 +346,7 @@
     }
 
     function pick(id) {
+      $('added-notice')?.remove();
       editingItem = null;
       current = data.products.find((product) => Number(product.id) === id);
       if (!current) return;
@@ -488,12 +490,19 @@
       $('added-notice')?.remove();
       const notice = document.createElement('aside');
       notice.id = 'added-notice';
-      notice.className = 'added-notice';
+      const suggestions = Number(product.category_id) === 1
+        ? [[2, 'セットを見る'], [5, 'アルコール'], [6, 'ソフトドリンク']].filter(([id]) => Boolean($(`c${id}`))) : [];
+      notice.className = 'added-notice' + (suggestions.length ? ' added-next' : '');
       notice.innerHTML = `<p role="status">✓ ${Machi.escapeHtml(product.name)}を追加しました</p><button type="button" class="added-review">カートを見る</button><button type="button" class="added-dismiss" aria-label="追加のお知らせを閉じる">×</button>`;
+      if (suggestions.length) {
+        notice.innerHTML = `<div class="added-next-heading"><p role="status">✓ ${Machi.escapeHtml(product.name)}をカートに追加しました</p><button type="button" class="added-dismiss" aria-label="追加のお知らせを閉じる">×</button></div><p class="added-next-caption">ご一緒にいかがですか？</p><div class="added-next-links">${suggestions.map(([id, label]) => `<button type="button" data-next-category="${id}">${label}</button>`).join('')}</div><div class="added-next-actions"><button type="button" class="added-review">カートへ進む</button><button type="button" class="added-continue">メニューに戻る</button></div>`;
+      }
       document.querySelector('main').insertAdjacentElement('beforebegin', notice);
+      notice.querySelectorAll('[data-next-category]').forEach(button => button.onclick = () => { notice.remove(); goCategory(Number(button.dataset.nextCategory)); });
+      if (notice.querySelector('.added-continue')) notice.querySelector('.added-continue').onclick = () => notice.remove();
       notice.querySelector('.added-dismiss').onclick = () => notice.remove();
       notice.querySelector('.added-review').onclick = showCart;
-      addedNoticeTimer = setTimeout(() => notice.remove(), 4000);
+      if (!suggestions.length) addedNoticeTimer = setTimeout(() => notice.remove(), 4000);
     }
     function updateCart() {
       const count = cart.reduce((sum, item) => sum + Number(item.quantity), 0);
