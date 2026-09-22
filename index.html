@@ -151,6 +151,10 @@
     function renderMenu() {
       $('tabs').innerHTML = displayCategories().map((category, index) => `<button type="button" class="tab ${index === 0 ? 'active' : ''}" data-cat="${Number(category.id)}" aria-controls="c${Number(category.id)}" aria-pressed="${index === 0}">${Machi.escapeHtml(category.name)}</button>`).join('');
       $('tabs').insertAdjacentHTML('beforeend', '<button type="button" id="open-takeout" class="tab takeout-tab">テイクアウト</button>');
+      $('open-takeout').insertAdjacentHTML('beforebegin', '<button type="button" id="open-refill" class="tab refill-tab">おかわり</button>');
+      $('tabs').insertAdjacentHTML('beforeend', '<button type="button" id="open-checkout-guide" class="tab checkout-guide-tab">会計案内</button>');
+      $('open-refill').onclick = showRefill;
+      $('open-checkout-guide').onclick = showCheckoutGuide;
       $('open-takeout').onclick = showTakeout;
       renderHappyOffer();
       const stopped = orderingMessage();
@@ -193,6 +197,19 @@
       };
     }
 
+    function showRefill() {
+      const categories = displayCategories().filter(c => ['アルコール', 'ソフトドリンク'].includes(c.name));
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><h2>おかわりはいかがですか？</h2><p>飲みたいものを選んで、カートからご注文ください。</p>${categories.map(c => `<button type="button" class="choice" data-refill-category="${Number(c.id)}">${Machi.escapeHtml(c.name)}を見る →</button>`).join('')}<button type="button" id="close-modal" class="choice">メニューへ戻る</button></div>`;
+      $('modal').querySelectorAll('[data-refill-category]').forEach(button => button.onclick = () => { closeModal(); goCategory(Number(button.dataset.refillCategory)); });
+      $('close-modal').onclick = closeModal;
+    }
+    function showCheckoutGuide() {
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><h2>お会計のご案内</h2><p>お会計はスタッフへお声がけください。</p><p class="desc">この画面からのスタッフ呼び出し・決済は行われません。</p>${cart.length ? '<div class="notice">カートにまだ注文していない商品があります。お会計前に内容をご確認ください。</div><button type="button" id="checkout-review-cart" class="choice">カートを確認する</button>' : ''}<button type="button" id="close-modal" class="choice">メニューへ戻る</button></div>`;
+      if ($('checkout-review-cart')) $('checkout-review-cart').onclick = showCart;
+      $('close-modal').onclick = closeModal;
+    }
     function showTakeout() {
       const supported = data.store === '長浜店';
       $('modal').className = 'modal';
