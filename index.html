@@ -261,12 +261,30 @@
       $('modal').innerHTML = `<div class="sheet"><h2>おうちへのおみやげに</h2><p>油そばやご飯ものを、ご家族にも。</p><div class="notice">持ち帰りは店内注文と別の注文・会計です。受取時刻を指定して注文できます。店内のカートはこの画面に残ります。</div>${supported ? '<p>商品の持ち帰り可否・容器代はスタッフにご確認ください。</p><a class="order takeout-link" href="/takeout.html" target="_blank" rel="noopener">持ち帰りメニューを開く（別画面）</a>' : '<div class="notice">この店舗の持ち帰り注文は、スタッフへお声がけください。</div>'}<button id="close-modal" class="choice">店内メニューへ戻る</button></div>`;
       $('close-modal').onclick = closeModal;
     }
+    // Only describe registered A–E sets; standalone rice bowls keep their usual cards.
+    function setDetails(product) {
+      const contents = {
+        'A ごはんセット': 'ごはん',
+        'B ごはん水餃子セット': 'ごはん＋水餃子',
+        'C 水餃子セット': '水餃子',
+        'D チャーシュー丼セット': 'チャーシュー丼',
+        'E チャーシュー丼餃子セット': 'チャーシュー丼＋餃子'
+      };
+      return Number(product.category_id) === 2 && Object.hasOwn(contents, product.name)
+        ? { label: product.name[0] + 'セット', contents: contents[product.name] } : null;
+    }
+    function setSummary(product) {
+      const details = setDetails(product);
+      return details ? `<div class="set-summary"><b>${Machi.escapeHtml(details.label)}</b><span>${Machi.escapeHtml(details.contents)}</span><small>油そばに追加 ＋${Machi.yen(product.price)}（油そば代別）</small></div>` : '';
+    }
     function recommendationCard(product) {
       const sold = product.sale_status !== 'available' || Boolean(orderingMessage());
-      return `<button type="button" class="recommend-item" ${sold ? 'disabled' : `data-product="${Number(product.id)}"`}>${productPhoto(product)}<span class="recommend-copy"><b>${Machi.escapeHtml(product.name)}</b><span>${Machi.yen(product.price)}${sold ? '・現在注文できません' : ''}</span></span><span aria-hidden="true">›</span></button>`;
+      return `<button type="button" class="recommend-item" ${sold ? 'disabled' : `data-product="${Number(product.id)}"`}>${productPhoto(product)}<span class="recommend-copy"><b>${Machi.escapeHtml(product.name)}</b><span>${setDetails(product) ? Machi.escapeHtml(setDetails(product).contents) + ' · ＋' : ''}${Machi.yen(product.price)}${sold ? '・現在注文できません' : ''}</span></span><span aria-hidden="true">›</span></button>`;
     }
     function productCard(product) {
       const sold = product.sale_status !== 'available';
+      const details = setDetails(product);
+      if (details) return `<article class="card set-card ${sold ? 'sold' : ''}" ${sold ? '' : `data-product="${Number(product.id)}"`}><div class="row">${productPhoto(product)}<div class="product"><div class="name">${Machi.escapeHtml(details.label)}</div><div class="set-contents">${Machi.escapeHtml(details.contents)}</div>${product.description ? `<div class="desc">${Machi.escapeHtml(product.description)}</div>` : ''}</div><div class="pricebox"><div><small class="set-price-label">油そばに追加</small><div class="price">＋${Machi.yen(product.price)}</div><small class="set-price-label">油そば代別</small></div><button class="add" ${sold ? 'disabled' : ''}>${sold ? '売切' : '選ぶ'}</button></div></div></article>`;
       return `<article class="card ${sold ? 'sold' : ''}" ${sold ? '' : `data-product="${Number(product.id)}"`}><div class="row">${productPhoto(product)}<div class="product"><div class="name">${Machi.escapeHtml(product.name)}</div>${product.description ? `<div class="desc">${Machi.escapeHtml(product.description)}</div>` : ''}<div class="desc">${sold ? '本日売り切れ' : 'タップして選択'}</div></div><div class="pricebox">${priceDisplay(product)}<button class="add" ${sold ? 'disabled' : ''}>${sold ? '売切' : '選ぶ'}</button></div></div></article>`;
     }
 
@@ -425,7 +443,7 @@
       const left = $('modal').querySelector('.topping-strip')?.scrollLeft || 0;
       const unit = Number(current.price) + optionDelta();
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet product-sheet"><div class="product-heading"><h2>${Machi.escapeHtml(current.name)}</h2><button id="close-modal" class="product-dismiss" aria-label="${editingItem ? '変更を保存せずカートに戻る' : '商品選択を閉じる'}">×</button></div><div class="product-scroll">${editingItem ? `<div class="cart-edit-note">カート内 ${Number(editingItem.original.quantity)}点のうち、下の数量分を変更します。残りは元の内容で残ります。${editingItem.optionsChanged ? '<br>選択肢が更新されています。内容を確認して選び直してください。' : ''}</div>` : ''}${CustomerOptions.render(productGroups(current), selected, Machi.escapeHtml, Machi.yen)}<p class="desc">変更内容はこの一杯に反映します。数量を増やすとすべて同じ内容です。内容を変える場合は別々に追加してください。</p></div><div class="product-actions"><div class="qtyrow" aria-label="${editingItem ? '変更する数量' : '数量'}"><button class="mini" data-qty="-1" aria-label="数量を減らす">−</button><b>${quantity}</b><button class="mini" data-qty="1" aria-label="数量を増やす">＋</button></div><button id="add-item" class="order product-add"><span>${Machi.yen(unit * quantity)}</span><span>${editingItem ? quantity + '点の変更を保存' : 'カートに追加'}</span></button></div></div>`;
+      $('modal').innerHTML = `<div class="sheet product-sheet"><div class="product-heading"><h2>${Machi.escapeHtml(current.name)}</h2><button id="close-modal" class="product-dismiss" aria-label="${editingItem ? '変更を保存せずカートに戻る' : '商品選択を閉じる'}">×</button></div><div class="product-scroll">${editingItem ? `<div class="cart-edit-note">カート内 ${Number(editingItem.original.quantity)}点のうち、下の数量分を変更します。残りは元の内容で残ります。${editingItem.optionsChanged ? '<br>選択肢が更新されています。内容を確認して選び直してください。' : ''}</div>` : ''}${setSummary(current)}${CustomerOptions.render(productGroups(current), selected, Machi.escapeHtml, Machi.yen)}<p class="desc">変更内容はこの一杯に反映します。数量を増やすとすべて同じ内容です。内容を変える場合は別々に追加してください。</p></div><div class="product-actions"><div class="qtyrow" aria-label="${editingItem ? '変更する数量' : '数量'}"><button class="mini" data-qty="-1" aria-label="数量を減らす">−</button><b>${quantity}</b><button class="mini" data-qty="1" aria-label="数量を増やす">＋</button></div><button id="add-item" class="order product-add"><span>${Machi.yen(unit * quantity)}</span><span>${editingItem ? quantity + '点の変更を保存' : 'カートに追加'}</span></button></div></div>`;
       document.querySelectorAll('[data-group]').forEach((button) => button.onclick = () => toggleOption(Number(button.dataset.group), Number(button.dataset.option), Number(button.dataset.max)));
       document.querySelectorAll('[data-qty]').forEach((button) => button.onclick = () => { quantity = Math.max(1, Math.min(editingItem ? Number(editingItem.original.quantity) : 20, quantity + Number(button.dataset.qty))); drawProduct(); });
       $('modal').querySelector('.product-scroll').scrollTop = top;

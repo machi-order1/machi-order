@@ -180,3 +180,17 @@
 .refill-item .desc { margin: 5px 0; }
 .refill-item button { flex: 0 0 auto; min-height: 44px; max-width: 110px; white-space: normal; }
 .refill-item button:disabled { opacity: .5; }
+
+/* Set contents remain alongside a compact photo, including narrow phones. */
+.set-contents { margin-top: 6px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.set-price-label { display: block; font-size: 11px; color: #79655a; font-weight: 500; }
+.set-summary { margin: 14px 0; padding: 12px; background: #fff0ea; border-radius: 12px; }
+.set-summary > * { display: block; margin-bottom: 4px; }
+.set-summary small { color: #79655a; }
+@media (max-width: 600px) {
+  .customer-menu-layout #menu .set-card > .row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; padding: 12px; align-items: center; }
+  .customer-menu-layout #menu .set-card .photo { width: 72px; height: 72px; aspect-ratio: 1; border-radius: 10px; }
+  .customer-menu-layout #menu .set-card .photo img { aspect-ratio: 1; }
+  .customer-menu-layout #menu .set-card .product { padding: 0; }
+  .customer-menu-layout #menu .set-card .pricebox { grid-column: 1 / -1; padding: 0; }
+}
