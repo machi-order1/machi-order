@@ -17,3 +17,9 @@
 .customer-menu-layout > .tabs { max-height: calc(100dvh - 112px); overflow-y: auto; overflow-x: hidden; }
 .customer-menu-layout > .tabs .tab { flex-shrink: 0; }
 @media(max-width:360px) { .happy-heading h2 {font-size:16px} .happy-offer {padding:8px 10px 4px} .happy-drink .happy-amount {font-size:20px} }
+
+.happy-offer.is-pinned { position: sticky; top: 0; z-index: 11; box-shadow: 0 3px 8px #68151422; }
+.happy-offer.is-pinned .happy-heading h2, .happy-offer.is-pinned .happy-heading p { display: none; }
+.happy-offer.is-pinned .happy-heading { margin-bottom: 4px; }
+.happy-offer.is-pinned .happy-end { padding: 3px 6px; }
+.customer-menu-layout > .tabs { top: calc(var(--pinned-offer-height, 0px) + 8px); max-height: calc(100dvh - 112px - var(--pinned-offer-height, 0px)); }
