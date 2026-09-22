@@ -1,0 +1,19 @@
+.happy-offer { max-width: 760px; margin: 0 auto; padding: 18px 14px 12px; background: #ffdc55; color: #681514; }
+.happy-heading { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.happy-heading h2 { margin: 4px 0; font-size: 23px; line-height: 1.35; }
+.happy-heading p { font-size: 13px; margin: 4px 0 14px; }
+.happy-eyebrow { font-size: 12px; font-weight: 900; letter-spacing: .14em; }
+.happy-end { background: #a91821; color: white; border-radius: 8px; padding: 8px; white-space: nowrap; font-size: 12px; }
+.happy-drinks { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+.happy-drink { padding: 10px 7px; background: #fffaf0; border-radius: 12px; display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+.happy-drink strong { font-size: 13px; min-height: 38px; overflow-wrap: anywhere; }
+.happy-drink s { color: #725a47; font-size: 12px; }
+.happy-drink .happy-amount { color: #b21923; font-size: 24px; padding: 4px 0; }
+.happy-drink small { font-size: 11px; }
+.happy-drink button { margin-top: 10px; min-height: 44px; width: 100%; border: 0; border-radius: 8px; background: #bf1c25; color: white; font-size: 12px; font-weight: 800; padding: 8px 3px; }
+.happy-bottom { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.happy-bottom button { border: 0; background: transparent; color: #681514; text-decoration: underline; min-height: 44px; font-size: 13px; font-weight: 800; padding: 5px; }
+#happy-added { font-size: 12px; }
+.customer-menu-layout > .tabs { max-height: calc(100dvh - 112px); overflow-y: auto; overflow-x: hidden; }
+.customer-menu-layout > .tabs .tab { flex-shrink: 0; }
+@media(max-width:360px) { .happy-heading h2 {font-size:20px} .happy-offer {padding:14px 10px 10px} .happy-drink .happy-amount {font-size:21px} }
