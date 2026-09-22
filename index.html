@@ -45,6 +45,7 @@
     let cart = restoreCart();
     let current = null;
     let selected = {};
+    let selectedToppings = [];
     let quantity = 1;
     let sending = false;
 
@@ -60,14 +61,25 @@
     addEventListener('offline', setNetworkState);
     setNetworkState();
 
+    const toppingIds = new Set([9, 10, 11, 12, 13, 14]);
+    const toppingCategoryId = 900001;
+    function isTopping(product) { return Number(product.category_id) === 3 && toppingIds.has(Number(product.id)); }
+    function categoryProducts(category) {
+      if (category.id === toppingCategoryId) return (data.products || []).filter(isTopping);
+      const ids = (data.categories || []).filter(item => Number(item.id) === Number(category.id) || Number(item.parent_id) === Number(category.id)).map(item => Number(item.id));
+      return (data.products || []).filter(product => ids.includes(Number(product.category_id)) && !isTopping(product));
+    }
     function displayCategories() {
       const categories = data.categories || [];
-      return categories.filter((item) => !item.parent_id).flatMap((root) => {
+      const visible = categories.filter((item) => !item.parent_id).flatMap((root) => {
         const children = categories
           .filter((item) => Number(item.parent_id) === Number(root.id))
           .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
         return children.length ? children : [root];
       });
+      visible.push({ id: toppingCategoryId, name: 'トッピング' });
+      const order = [1, toppingCategoryId, 2, 3, 5, 6];
+      return visible.sort((a, b) => (order.includes(Number(a.id)) ? order.indexOf(Number(a.id)) : 99) - (order.includes(Number(b.id)) ? order.indexOf(Number(b.id)) : 99));
     }
     function productGroups(product) {
       return (product.option_group_ids || []).map((id) => data.option_groups.find((group) => Number(group.id) === Number(id))).filter(Boolean);
@@ -118,19 +130,39 @@
 
     function renderMenu() {
       $('tabs').innerHTML = displayCategories().map((category, index) => `<button type="button" class="tab ${index === 0 ? 'active' : ''}" data-cat="${Number(category.id)}" aria-controls="c${Number(category.id)}" aria-pressed="${index === 0}">${Machi.escapeHtml(category.name)}</button>`).join('');
+      $('tabs').insertAdjacentHTML('beforeend', '<button type="button" id="open-takeout" class="tab takeout-tab">テイクアウト</button>');
+      $('open-takeout').onclick = showTakeout;
       const happyProduct = (data.products || []).find((product) => product.price_type === 'happy_hour');
       const happyEnd = happyProduct?.price_rule_end_time ? happyProduct.price_rule_end_time.slice(0, 5) : '';
       const happyBanner = happyProduct ? `<div class="happy-banner"><div><strong>🔥 ハッピーアワー開催中！</strong><span>アルコールがお得な期間限定価格</span></div><b>${Machi.escapeHtml(happyEnd || '終了時刻まで')}</b></div>` : '';
       const stopped = orderingMessage();
       const orderingNotice = stopped ? `<div class="notice danger"><b>${data.ordering?.enabled === false ? 'ただいま注文受付を停止中です' : 'ただいま営業時間外です'}</b><br>${Machi.escapeHtml(stopped)}</div>` : '';
       $('menu').innerHTML = orderingNotice + happyBanner + displayCategories().map((category) => {
-        const ids = (data.categories || []).filter((item) => Number(item.id) === Number(category.id) || Number(item.parent_id) === Number(category.id)).map((item) => Number(item.id));
-        const products = (data.products || []).filter((product) => ids.includes(Number(product.category_id)));
+        const products = categoryProducts(category);
         return `<section id="c${Number(category.id)}"><h2>${Machi.escapeHtml(category.name)}</h2>${products.map(productCard).join('')}</section>`;
       }).join('');
       document.querySelectorAll('[data-cat]').forEach((button) => button.onclick = () => goCategory(Number(button.dataset.cat)));
       document.querySelectorAll('[data-product]').forEach((element) => element.onclick = () => pick(Number(element.dataset.product)));
       observeSections();
+    }
+
+    function showTakeout() {
+      const supported = data.store === '長浜店';
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><h2>おうちへのおみやげに</h2><p>油そばやご飯ものを、ご家族にも。</p><div class="notice">持ち帰りは店内注文と別の注文・会計です。受取時刻を指定して注文できます。店内のカートはこの画面に残ります。</div>${supported ? '<p>商品の持ち帰り可否・容器代はスタッフにご確認ください。</p><a class="order takeout-link" href="/takeout.html?store_id=1" target="_blank" rel="noopener">持ち帰りメニューを開く（別画面）</a>' : '<div class="notice">この店舗の持ち帰り注文は、スタッフへお声がけください。</div>'}<button id="close-modal" class="choice">店内メニューへ戻る</button></div>`;
+      $('close-modal').onclick = closeModal;
+    }
+    function toppingProducts() {
+      if (Number(current?.category_id) !== 1) return [];
+      return (data.products || []).filter(product => isTopping(product) && !productGroups(product).length);
+    }
+    function toppingTotal() {
+      return toppingProducts().filter(product => selectedToppings.includes(Number(product.id))).reduce((sum, product) => sum + Number(product.price), 0);
+    }
+    function toppingChoices() {
+      const products = toppingProducts();
+      if (!products.length) return '';
+      return `<div class="topping-picker"><h3>お好みのトッピングを追加</h3><p class="desc">選択は任意です。各トッピングを油そば1杯につき1点、追加商品として注文します。</p>${products.map(product => `<button type="button" class="choice ${selectedToppings.includes(Number(product.id)) ? 'sel' : ''}" data-topping="${Number(product.id)}" aria-pressed="${selectedToppings.includes(Number(product.id))}" ${product.sale_status !== 'available' ? 'disabled' : ''}>${Machi.escapeHtml(product.name)} <b>＋${Machi.yen(product.price)}</b>${product.sale_status !== 'available' ? '（売り切れ）' : ''}</button>`).join('')}</div>`;
     }
 
     function productCard(product) {
@@ -199,16 +231,27 @@
       current = data.products.find((product) => Number(product.id) === id);
       if (!current) return;
       selected = {};
+      selectedToppings = [];
       productGroups(current).forEach((group) => selected[group.id] = []);
       quantity = 1;
       drawProduct();
     }
     function drawProduct() {
-      const unit = Number(current.price) + optionDelta();
+      const unit = Number(current.price) + optionDelta() + toppingTotal();
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet"><div class="row"><h2>${Machi.escapeHtml(current.name)}</h2><div class="price">${Machi.yen(unit)}</div></div>${productGroups(current).map((group) => `<h3>${Machi.escapeHtml(group.name)}${group.required ? '（必須）' : ''}</h3>${(group.options || []).map((option) => `<button class="choice ${(selected[group.id] || []).includes(option.id) ? 'sel' : ''}" data-group="${Number(group.id)}" data-option="${Number(option.id)}" data-max="${Number(group.max_select || 1)}">${Machi.escapeHtml(option.name)} ${Number(option.price_delta) ? `+${Machi.yen(option.price_delta)}` : ''}</button>`).join('')}`).join('')}<h3>数量</h3><div class="qtyrow"><button class="mini" data-qty="-1">−</button><b>${quantity}</b><button class="mini" data-qty="1">＋</button></div><button id="add-item" class="order">${Machi.yen(unit * quantity)}　カートに追加</button><button id="close-modal" class="choice">閉じる</button></div>`;
+      $('modal').innerHTML = `<div class="sheet"><div class="row"><h2>${Machi.escapeHtml(current.name)}</h2><div class="price">${Machi.yen(unit)}</div></div>${productGroups(current).map((group) => `<h3>${Machi.escapeHtml(group.name)}${group.required ? '（必須）' : ''}</h3>${(group.options || []).map((option) => `<button class="choice ${(selected[group.id] || []).includes(option.id) ? 'sel' : ''}" data-group="${Number(group.id)}" data-option="${Number(option.id)}" data-max="${Number(group.max_select || 1)}">${Machi.escapeHtml(option.name)} ${Number(option.price_delta) ? `+${Machi.yen(option.price_delta)}` : ''}</button>`).join('')}`).join('')}${toppingChoices()}<h3>数量</h3><div class="qtyrow"><button class="mini" data-qty="-1">−</button><b>${quantity}</b><button class="mini" data-qty="1">＋</button></div><button id="add-item" class="order">${Machi.yen(unit * quantity)}　カートに追加</button><button id="close-modal" class="choice">閉じる</button></div>`;
       document.querySelectorAll('[data-group]').forEach((button) => button.onclick = () => toggleOption(Number(button.dataset.group), Number(button.dataset.option), Number(button.dataset.max)));
       document.querySelectorAll('[data-qty]').forEach((button) => button.onclick = () => { quantity = Math.max(1, Math.min(20, quantity + Number(button.dataset.qty))); drawProduct(); });
+      document.querySelectorAll('[data-topping]').forEach(button => button.onclick = () => {
+        const id = Number(button.dataset.topping);
+        const product = toppingProducts().find(item => Number(item.id) === id);
+        if (!product || product.sale_status !== 'available') return;
+        selectedToppings = selectedToppings.includes(id) ? selectedToppings.filter(value => value !== id) : [...selectedToppings, id];
+        const sheet = $('modal').querySelector('.sheet');
+        const top = sheet.scrollTop;
+        drawProduct();
+        $('modal').querySelector('.sheet').scrollTop = top;
+      });
       $('add-item').onclick = addItem;
       $('close-modal').onclick = closeModal;
     }
@@ -222,8 +265,11 @@
         const minimum = Number(group.min_select || (group.required ? 1 : 0));
         if ((selected[group.id] || []).length < minimum) return alert(`${group.name}を選んでください`);
       }
+      const extras = toppingProducts().filter(product => selectedToppings.includes(Number(product.id)));
+      if (extras.some(product => product.sale_status !== 'available')) return alert('売り切れのトッピングを外してください');
       const optionIds = Object.values(selected).flat();
       cart.push({ product_id: current.id, quantity, option_ids: optionIds, option_names: optionDetails(optionIds).map((item) => item.name), name: current.name, price: Number(current.price) + optionDelta() });
+      extras.forEach(product => cart.push({ product_id: product.id, quantity, option_ids: [], option_names: [], name: product.name, price: Number(product.price) }));
       saveCart();
       updateCart();
       closeModal();
