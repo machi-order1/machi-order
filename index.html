@@ -258,7 +258,7 @@
     function showTakeout() {
       const supported = data.store === '長浜店';
       $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet"><h2>おうちへのおみやげに</h2><p>油そばやご飯ものを、ご家族にも。</p><div class="notice">持ち帰りは店内注文と別の注文・会計です。受取時刻を指定して注文できます。店内のカートはこの画面に残ります。</div>${supported ? '<p>商品の持ち帰り可否・容器代はスタッフにご確認ください。</p><a class="order takeout-link" href="/takeout.html?store_id=' + Number(data.store.id) + '" target="_blank" rel="noopener">持ち帰りメニューを開く（別画面）</a>' : '<div class="notice">この店舗の持ち帰り注文は、スタッフへお声がけください。</div>'}<button id="close-modal" class="choice">店内メニューへ戻る</button></div>`;
+      $('modal').innerHTML = `<div class="sheet"><h2>おうちへのおみやげに</h2><p>油そばやご飯ものを、ご家族にも。</p><div class="notice">持ち帰りは店内注文と別の注文・会計です。受取時刻を指定して注文できます。店内のカートはこの画面に残ります。</div>${supported ? '<p>商品の持ち帰り可否・容器代はスタッフにご確認ください。</p><a class="order takeout-link" href="/takeout.html" target="_blank" rel="noopener">持ち帰りメニューを開く（別画面）</a>' : '<div class="notice">この店舗の持ち帰り注文は、スタッフへお声がけください。</div>'}<button id="close-modal" class="choice">店内メニューへ戻る</button></div>`;
       $('close-modal').onclick = closeModal;
     }
     function recommendationCard(product) {
