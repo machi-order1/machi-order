@@ -13,10 +13,13 @@
   </style>
   <link rel="stylesheet" href="/customer-menu.css">
   <script src="/machi-app.js"></script>
+  <script src="/customer-promotions.js"></script>
+  <link rel="stylesheet" href="/customer-promotions.css">
   <script src="/customer-options.js"></script>
 </head>
 <body>
   <div id="net" class="net hidden">オフライン</div>
+  <aside id="happy-offer" class="happy-offer hidden" aria-label="ハッピーアワー"></aside>
   <header>
     <div class="brandhead">
       <img class="brandmark" src="/assets/brand/151-logo-white.webp" alt="博多油そば151">
@@ -63,8 +66,10 @@
 
     const toppingIds = new Set([9, 10, 11, 12, 13, 14]);
     const toppingCategoryId = 900001;
+    const recommendedCategoryId = 900000;
     function isTopping(product) { return Number(product.category_id) === 3 && toppingIds.has(Number(product.id)); }
     function categoryProducts(category) {
+      if (category.id === recommendedCategoryId) return CustomerPromotions.recommendations(data);
       if (category.id === toppingCategoryId) return (data.products || []).filter(isTopping);
       const ids = (data.categories || []).filter(item => Number(item.id) === Number(category.id) || Number(item.parent_id) === Number(category.id)).map(item => Number(item.id));
       return (data.products || []).filter(product => ids.includes(Number(product.category_id)) && !isTopping(product));
@@ -77,8 +82,8 @@
           .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
         return children.length ? children : [root];
       });
-      visible.push({ id: toppingCategoryId, name: 'トッピング' });
-      const order = [1, toppingCategoryId, 2, 3, 5, 6];
+      visible.push({ id: recommendedCategoryId, name: 'おすすめ' }, { id: toppingCategoryId, name: 'トッピング' });
+      const order = [recommendedCategoryId, 1, toppingCategoryId, 2, 3, 5, 6];
       return visible.sort((a, b) => (order.includes(Number(a.id)) ? order.indexOf(Number(a.id)) : 99) - (order.includes(Number(b.id)) ? order.indexOf(Number(b.id)) : 99));
     }
     function productGroups(product) {
@@ -132,18 +137,43 @@
       $('tabs').innerHTML = displayCategories().map((category, index) => `<button type="button" class="tab ${index === 0 ? 'active' : ''}" data-cat="${Number(category.id)}" aria-controls="c${Number(category.id)}" aria-pressed="${index === 0}">${Machi.escapeHtml(category.name)}</button>`).join('');
       $('tabs').insertAdjacentHTML('beforeend', '<button type="button" id="open-takeout" class="tab takeout-tab">テイクアウト</button>');
       $('open-takeout').onclick = showTakeout;
-      const happyProduct = (data.products || []).find((product) => product.price_type === 'happy_hour');
-      const happyEnd = happyProduct?.price_rule_end_time ? happyProduct.price_rule_end_time.slice(0, 5) : '';
-      const happyBanner = happyProduct ? `<div class="happy-banner"><div><strong>🔥 ハッピーアワー開催中！</strong><span>アルコールがお得な期間限定価格</span></div><b>${Machi.escapeHtml(happyEnd || '終了時刻まで')}</b></div>` : '';
+      renderHappyOffer();
       const stopped = orderingMessage();
       const orderingNotice = stopped ? `<div class="notice danger"><b>${data.ordering?.enabled === false ? 'ただいま注文受付を停止中です' : 'ただいま営業時間外です'}</b><br>${Machi.escapeHtml(stopped)}</div>` : '';
-      $('menu').innerHTML = orderingNotice + happyBanner + displayCategories().map((category) => {
+      $('menu').innerHTML = orderingNotice + displayCategories().map((category) => {
         const products = categoryProducts(category);
         return `<section id="c${Number(category.id)}"><h2>${Machi.escapeHtml(category.name)}</h2>${products.map(productCard).join('')}</section>`;
       }).join('');
       document.querySelectorAll('[data-cat]').forEach((button) => button.onclick = () => goCategory(Number(button.dataset.cat)));
       document.querySelectorAll('[data-product]').forEach((element) => element.onclick = () => pick(Number(element.dataset.product)));
       observeSections();
+    }
+
+    function renderHappyOffer() {
+      const offer = $('happy-offer');
+      offer.innerHTML = CustomerPromotions.renderHappy(data, Machi.escapeHtml, Machi.yen);
+      offer.classList.toggle('hidden', !offer.innerHTML);
+      document.querySelectorAll('[data-happy-product]').forEach(button => button.onclick = async () => {
+        const id = Number(button.dataset.happyProduct);
+        button.disabled = true;
+        try {
+          data = await Machi.api('menu-api', { params: { t: seatToken }, token: '' });
+          renderMenu();
+          const product = CustomerPromotions.happyDrinks(data).find(item => Number(item.id) === id);
+          if (!product || orderingMessage()) return alert('価格・受付状況が変わりました。最新のメニューをご確認ください。');
+          pick(id);
+          if (!productGroups(product).length) {
+            addItem();
+            if ($('happy-added')) $('happy-added').textContent = `${product.name}をカートに追加しました`;
+          }
+        } catch {
+          alert('メニューを確認できませんでした。通信状態をご確認ください。');
+        } finally { if (button.isConnected) button.disabled = false; }
+      });
+      if ($('happy-view-all')) $('happy-view-all').onclick = () => {
+        const category = displayCategories().find(item => item.name === 'アルコール');
+        if (category) goCategory(Number(category.id));
+      };
     }
 
     function showTakeout() {
@@ -165,10 +195,9 @@
     function schedulePriceBoundaryRefresh() {
       const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)]));
       const seconds = parts.hour * 3600 + parts.minute * 60 + parts.second;
-      const schedule = (data.price_schedules || [])[0];
-      const start = schedule?.start_time ? Number(schedule.start_time.slice(0, 2)) * 3600 + Number(schedule.start_time.slice(3, 5)) * 60 : 11 * 3600;
-      const end = schedule?.end_time ? Number(schedule.end_time.slice(0, 2)) * 3600 + Number(schedule.end_time.slice(3, 5)) * 60 : 22 * 3600;
-      const boundaries = [start, end, start + 24 * 3600, end + 24 * 3600].sort((a, b) => a - b);
+      const times = (data.price_schedules || []).flatMap(rule => [rule.start_time, rule.end_time]).filter(Boolean);
+      const edges = times.length ? times.map(time => Number(time.slice(0, 2)) * 3600 + Number(time.slice(3, 5)) * 60) : [11 * 3600, 22 * 3600];
+      const boundaries = [...new Set([...edges, ...edges.map(edge => edge + 24 * 3600), 24 * 3600])].sort((a, b) => a - b);
       const next = boundaries.find((boundary) => boundary > seconds);
       setTimeout(() => location.reload(), Math.max(1000, (next - seconds) * 1000 + 1500));
     }
