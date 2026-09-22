@@ -150,7 +150,7 @@
     }
 
     function renderMenu() {
-      $('tabs').innerHTML = displayCategories().map((category, index) => `<button type="button" class="tab ${index === 0 ? 'active' : ''}" data-cat="${Number(category.id)}" aria-controls="c${Number(category.id)}" aria-pressed="${index === 0}">${Machi.escapeHtml(category.name)}</button>`).join('');
+      $('tabs').innerHTML = displayCategories().map((category, index) => `${index === 1 ? '<span class="nav-menu-label">通常メニュー</span>' : ''}<button type="button" class="tab ${index === 0 ? 'active' : ''}" data-cat="${Number(category.id)}" aria-controls="c${Number(category.id)}" aria-pressed="${index === 0}">${Machi.escapeHtml(category.name)}</button>`).join('');
       $('tabs').insertAdjacentHTML('beforeend', '<button type="button" id="open-takeout" class="tab takeout-tab">テイクアウト</button>');
       $('open-takeout').insertAdjacentHTML('beforebegin', '<button type="button" id="open-refill" class="tab refill-tab">おかわり</button>');
       $('tabs').insertAdjacentHTML('beforeend', '<button type="button" id="open-checkout-guide" class="tab checkout-guide-tab">会計案内</button>');
@@ -160,9 +160,9 @@
       renderHappyOffer();
       const stopped = orderingMessage();
       const orderingNotice = stopped ? `<div class="notice danger"><b>${data.ordering?.enabled === false ? 'ただいま注文受付を停止中です' : 'ただいま営業時間外です'}</b><br>${Machi.escapeHtml(stopped)}</div>` : '';
-      $('menu').innerHTML = orderingNotice + displayCategories().map((category) => {
+      $('menu').innerHTML = orderingNotice + displayCategories().map((category, index) => {
         const products = categoryProducts(category);
-        return `<section id="c${Number(category.id)}"><h2>${Machi.escapeHtml(category.name)}</h2>${products.map(productCard).join('')}</section>`;
+        return `<section id="c${Number(category.id)}" class="${Number(category.id) === recommendedCategoryId ? 'recommend-section' : ''}">${index === 1 ? '<div class="regular-menu-heading">通常メニュー</div>' : ''}<h2>${Machi.escapeHtml(category.name)}</h2>${Number(category.id) === recommendedCategoryId ? '<p class="recommend-caption">迷ったときの4品</p>' + products.map(recommendationCard).join('') : products.map(productCard).join('')}</section>`;
       }).join('');
       document.querySelectorAll('[data-cat]').forEach((button) => button.onclick = () => goCategory(Number(button.dataset.cat)));
       document.querySelectorAll('[data-product]').forEach((element) => element.onclick = () => pick(Number(element.dataset.product)));
@@ -216,6 +216,10 @@
       $('modal').className = 'modal';
       $('modal').innerHTML = `<div class="sheet"><h2>おうちへのおみやげに</h2><p>油そばやご飯ものを、ご家族にも。</p><div class="notice">持ち帰りは店内注文と別の注文・会計です。受取時刻を指定して注文できます。店内のカートはこの画面に残ります。</div>${supported ? '<p>商品の持ち帰り可否・容器代はスタッフにご確認ください。</p><a class="order takeout-link" href="/takeout.html?store_id=' + Number(data.store.id) + '" target="_blank" rel="noopener">持ち帰りメニューを開く（別画面）</a>' : '<div class="notice">この店舗の持ち帰り注文は、スタッフへお声がけください。</div>'}<button id="close-modal" class="choice">店内メニューへ戻る</button></div>`;
       $('close-modal').onclick = closeModal;
+    }
+    function recommendationCard(product) {
+      const sold = product.sale_status !== 'available' || Boolean(orderingMessage());
+      return `<button type="button" class="recommend-item" ${sold ? 'disabled' : `data-product="${Number(product.id)}"`}>${productPhoto(product)}<span class="recommend-copy"><b>${Machi.escapeHtml(product.name)}</b><span>${Machi.yen(product.price)}${sold ? '・現在注文できません' : ''}</span></span><span aria-hidden="true">›</span></button>`;
     }
     function productCard(product) {
       const sold = product.sale_status !== 'available';
@@ -371,33 +375,18 @@
       showAddedNotice(current);
     }
 
-    function setOffers(product) {
-      if (Number(product.category_id) !== 1 || orderingMessage()) return [];
-      if (cart.some(item => [16,17,18,19,20].includes(Number(item.product_id)))) return [];
-      return [16,20].map(id => data.products.find(item => Number(item.id) === id))
-        .filter(item => item && item.sale_status === 'available');
-    }
+    let addedNoticeTimer;
     function showAddedNotice(product) {
-      let notice = $('added-notice');
-      if (!notice) {
-        notice = document.createElement('aside');
-        notice.id = 'added-notice';
-        notice.className = 'added-notice';
-        document.querySelector('main').insertAdjacentElement('beforebegin', notice);
-      }
-      const offers = setOffers(product);
-      notice.innerHTML = `<div class="added-heading"><p role="status">✓ ${Machi.escapeHtml(product.name)}を追加しました</p><button type="button" class="added-dismiss" aria-label="追加のお知らせを閉じる">×</button></div>${offers.length ? `<p class="set-offer-title">一緒にセットはいかがですか？</p><div class="set-offers">${offers.map(item => `<button type="button" data-offer-set="${Number(item.id)}"><img src="/assets/menu-items/web/set-${Number(item.id) === 16 ? 'a' : 'e'}.webp" alt="" width="48" height="48"><span><b>${Machi.escapeHtml(item.name)}</b><small>＋${Machi.yen(item.price)}／1点</small></span></button>`).join('')}</div>` : ''}<button type="button" class="added-review">${offers.length ? 'セットを付けずに注文内容を確認' : '注文内容を確認する'} →</button>`;
+      clearTimeout(addedNoticeTimer);
+      $('added-notice')?.remove();
+      const notice = document.createElement('aside');
+      notice.id = 'added-notice';
+      notice.className = 'added-notice';
+      notice.innerHTML = `<p role="status">✓ ${Machi.escapeHtml(product.name)}を追加しました</p><button type="button" class="added-review">カートを見る</button><button type="button" class="added-dismiss" aria-label="追加のお知らせを閉じる">×</button>`;
+      document.querySelector('main').insertAdjacentElement('beforebegin', notice);
       notice.querySelector('.added-dismiss').onclick = () => notice.remove();
       notice.querySelector('.added-review').onclick = showCart;
-      notice.querySelectorAll('[data-offer-set]').forEach(button => button.onclick = () => {
-        const id = Number(button.dataset.offerSet);
-        const item = data.products.find(value => Number(value.id) === id);
-        if (!item || item.sale_status !== 'available' || orderingMessage()) return;
-        button.disabled = true;
-        pick(id);
-        if (!productGroups(current).length) addItem();
-      });
-      notice.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      addedNoticeTimer = setTimeout(() => notice.remove(), 4000);
     }
     function updateCart() {
       const count = cart.reduce((sum, item) => sum + Number(item.quantity), 0);
