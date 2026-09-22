@@ -13,7 +13,20 @@ assert.deepEqual(Array.from(api.recommendations({products:[{id:20},{id:5,sale_st
 assert.equal(api.recommendations({products:[{id:5}]}).length,1);
 const html=api.renderHappy(data,String,n=>'¥'+n);
 assert.ok(html.includes('22:00まで'));
-assert.ok(html.includes('¥400お得'));
+assert.ok(html.includes('通常 ¥600'));
+assert.ok(html.includes('¥200'));
 assert.ok(html.includes('カートに追加'));
 assert.ok(!html.includes('data-happy-product="40"'));
 console.log('Customer promotions behavior checks passed');
+
+assert.equal(api.containsAlcohol(data,[{product_id:29}]),true);
+assert.equal(api.containsAlcohol(data,[{product_id:41}]),false);
+const regular={...data,products:[drink(29,{price_type:'regular',price:600})]};
+assert.equal(api.renderHappy(regular,String,String),'');
+const pinned=api.renderHappy(regular,String,String,true);
+assert.ok(pinned.includes('お酒を追加'));
+assert.ok(!pinned.includes('HAPPY HOUR'));
+assert.ok(!pinned.includes('<s>'));
+assert.ok(pinned.includes('600'));
+assert.equal(api.renderHappy({...regular,ordering:{enabled:false}},String,String,true),'');
+console.log('Pinned alcohol and regular-price fallback checks passed');
