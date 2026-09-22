@@ -35,9 +35,13 @@
   background: #fff0e3;
 }
 .takeout-link { display: block; text-align: center; text-decoration: none; }
-.topping-picker { margin: 20px 0; border-top: 1px solid #efd7d1; }
-.topping-picker .choice { white-space: normal; overflow-wrap: anywhere; }
-.topping-picker .choice:disabled { opacity: .5; }
+.bowl-options { margin: 20px 0; }
+.bowl-options .choice { white-space: normal; overflow-wrap: anywhere; }
+.bowl-options .choice span { display: block; font-size: 12px; margin-top: 4px; }
+.bowl-options .choice:disabled { opacity: .5; }
+.ingredient-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ingredient-options h3 { grid-column: 1 / -1; margin: 4px 0; }
+.ingredient-options .choice { padding: 12px 6px; text-align: center; font-size: 14px; min-height: 64px; }
 @media (max-height: 620px) {
   .customer-menu-layout > .tabs { max-height: calc(100dvh - 105px); overflow-y: auto; }
 }
