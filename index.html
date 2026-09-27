@@ -349,6 +349,8 @@
     }
 
     function pick(id) {
+      if (sending) return;
+      if (localStorage.getItem(pendingKey)) return showPendingReview();
       $('added-notice')?.remove();
       editingItem = null;
       current = data.products.find((product) => Number(product.id) === id);
@@ -476,6 +478,8 @@
       if (strip) strip.scrollLeft = left;
     }
     function addItem() {
+      if (sending) return;
+      if (localStorage.getItem(pendingKey)) return showPendingReview();
       if (editingItem) return saveEditedItem();
       const error = CustomerOptions.validate(productGroups(current), selected);
       if (error) return alert(error);
@@ -545,6 +549,8 @@
       return `<div class="notice seat-review"><small>お届け先をご確認ください</small><strong>${Machi.escapeHtml(orderDestination())}</strong><span>席が違う場合は、注文せずにお席のQRコードを読み直してください。</span></div>`;
     }
     function showCart() {
+      if (sending) return;
+      if (localStorage.getItem(pendingKey)) return showPendingReview();
       editingItem = null;
       $('added-notice')?.remove();
       const total = cart.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
@@ -565,13 +571,19 @@
       if (!navigator.onLine) return alert('オフラインです。通信が戻ってから注文してください。');
       if (localStorage.getItem(pendingKey)) return showPendingWarning(true);
       if (!confirm(`${orderDestination()}へ注文します。\nこの内容で注文を確定しますか？`)) return;
+      const requestId = Machi.createId('customer');
+      const orderedItems = cart.map(item => ({ ...item, option_ids: [...(item.option_ids || [])], option_names: [...(item.option_names || [])] }));
+      try {
+        localStorage.setItem(pendingKey, JSON.stringify({ request_id: requestId, created_at: new Date().toISOString(), items: orderedItems }));
+      } catch {
+        alert('注文確認用の記録を保存できません。注文は送信していません。店員へお声がけください。');
+        return;
+      }
       sending = true;
       const button = $('send-order');
       button.disabled = true;
       button.textContent = '送信中…';
-      const requestId = Machi.createId('customer');
-      const orderedItems = cart.map(item => ({ ...item, option_ids: [...(item.option_ids || [])], option_names: [...(item.option_names || [])] }));
-      localStorage.setItem(pendingKey, JSON.stringify({ request_id: requestId, created_at: new Date().toISOString(), items: cart }));
+      $('modal').querySelectorAll('button').forEach(control => { control.disabled = true; });
       try {
         const payload = { token: seatToken, table_id: data.table_id, request_id: requestId, items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, option_ids: item.option_ids })) };
         const result = orderChannel === 'staff'
@@ -593,15 +605,68 @@
       $('modal').innerHTML = `<div class="sheet"><div class="success">✓</div><h2 style="text-align:center">${result.test ? 'テスト確認OK' : 'ご注文ありがとうございます！'}</h2><div class="card">${result.test ? '実注文は送信していません。' : `注文番号 #${Machi.escapeHtml(result.order_id || '-')}${result.total !== undefined ? `<br><b>合計 ${Machi.yen(result.total)}</b>` : ''}<br>厨房へ注文を送信しました。`}</div><button id="close-modal" class="order">メニューへ戻る</button></div>`;
       $('close-modal').onclick = closeModal;
     }
-    function showAmbiguousFailure(error) {
-      $('modal').className = 'modal';
-      $('modal').innerHTML = `<div class="sheet"><div class="notice danger"><b>注文状況を確認しています</b><br>二重注文防止のため、自動で再送信はしません。店員に画面を見せて、厨房へ届いているか確認してください。</div><div class="desc">${Machi.escapeHtml(error.message)}</div><button id="checked-order" class="order">店員と確認した</button></div>`;
-      $('checked-order').onclick = () => { localStorage.removeItem(pendingKey); closeModal(); showCart(); };
+    function pendingOrder() {
+      try {
+        const value = JSON.parse(localStorage.getItem(pendingKey) || 'null');
+        return value && Array.isArray(value.items) ? value : null;
+      } catch { return null; }
     }
+    function cartAfterReceived(items, submitted) {
+      const key = item => JSON.stringify([Number(item.product_id), (item.option_ids || []).map(Number).sort((a,b) => a-b)]);
+      const remaining = items.map(item => ({ ...item }));
+      for (const item of submitted) {
+        let count = Number(item.quantity);
+        if (!Number.isInteger(count) || count <= 0) throw new Error('確認対象の数量を読み取れません。店員へお声がけください。');
+        for (const line of remaining) {
+          if (key(line) !== key(item)) continue;
+          const removed = Math.min(Number(line.quantity), count);
+          line.quantity -= removed;
+          count -= removed;
+          if (!count) break;
+        }
+        if (count) throw new Error('カートの内容が変わっています。確認画面を店員に見せてください。');
+      }
+      return remaining.filter(item => item.quantity > 0);
+    }
+    function showPendingReview(error) {
+      const pending = pendingOrder();
+      const items = pending?.items || [];
+      $('added-notice')?.remove();
+      $('modal').className = 'modal';
+      $('modal').innerHTML = `<div class="sheet"><h2>店員に注文状況をご確認ください</h2><div class="notice danger">厨房へ届いている可能性があります。二重注文を防ぐため、確認が終わるまで再送信しません。</div><b>${Machi.escapeHtml(orderDestination())}</b>${pending?.request_id ? `<p class="desc">確認用番号：${Machi.escapeHtml(pending.request_id)}</p>` : ''}${items.map(item => `<div class="card"><b>${Machi.escapeHtml(item.name)} × ${Number(item.quantity)}</b><div class="desc">${(item.option_names || []).map(Machi.escapeHtml).join(' ／ ')}</div></div>`).join('')}${error ? `<p class="desc">${Machi.escapeHtml(error.message || '')}</p>` : ''}${pending && items.length ? '<p class="desc">店員の確認結果に合わせて選んでください。</p><button id="pending-received" class="order">店員に確認：届いていた</button><button id="pending-not-received" class="choice">店員に確認：届いていなかった</button>' : '<p class="notice">確認内容を読み取れません。店員へこの画面をお見せください。</p>'}<button id="close-modal" class="choice">まだ分からない・閉じる</button></div>`;
+      if ($('pending-received')) $('pending-received').onclick = () => resolvePendingOrder(true);
+      if ($('pending-not-received')) $('pending-not-received').onclick = () => resolvePendingOrder(false);
+      $('close-modal').onclick = closeModal;
+    }
+    function resolvePendingOrder(received) {
+      const pending = pendingOrder();
+      if (!pending?.items?.length || sending) return;
+      const question = received ? '店員に、この注文が届いていたと確認できましたか？確認対象をカートから外します。' : '店員に、この注文が届いていないと確認できましたか？カートに戻ります。この操作では再送信しません。';
+      if (!confirm(question)) return;
+      try {
+        if (received) {
+          const next = cartAfterReceived(restoreCart(), pending.items);
+          localStorage.setItem(cartKey, JSON.stringify(next));
+          cart = next;
+        }
+        localStorage.removeItem(pendingKey);
+        $('pending-order-notice')?.remove();
+        updateCart();
+        closeModal();
+        if (received) {
+          $('modal').className = 'modal';
+          $('modal').innerHTML = '<div class="sheet"><h2>確認ありがとうございます</h2><p>店員に確認した注文をカートから外しました。追加の注文はメニューから選べます。</p><button id="close-modal" class="order">メニューへ戻る</button></div>';
+          $('close-modal').onclick = closeModal;
+        } else showCart();
+      } catch (error) { alert(error.message || '確認結果を保存できませんでした。店員へお声がけください。'); }
+    }
+    function showAmbiguousFailure(error) { showPendingReview(error); }
     function showPendingWarning(force) {
       if (!localStorage.getItem(pendingKey)) return;
-      if (force) alert('直前の注文が厨房へ届いている可能性があります。店員に確認してください。');
-      $('menu').insertAdjacentHTML('afterbegin', '<div class="notice danger"><b>直前の注文を確認中です。</b><br>二重送信を防ぐため、店員へお声がけください。</div>');
+      $('pending-order-notice')?.remove();
+      $('menu').insertAdjacentHTML('afterbegin', '<div id="pending-order-notice" class="notice danger"><b>直前の注文の確認が必要です。</b><br>店員に注文が届いたかご確認ください。<br><button id="review-pending-order" class="retry">確認する注文を表示</button></div>');
+      $('review-pending-order').onclick = () => showPendingReview();
+      if (force) showPendingReview();
     }
     function closeModal() { editingItem = null; $('modal').className = 'hidden'; $('modal').innerHTML = ''; }
     $('open-cart').onclick = showCart;
