@@ -27,7 +27,7 @@ const html = await fs.readFile(new URL('../index.html',import.meta.url),'utf8');
 const orderSource = html.slice(html.indexOf('    async function order()'),html.indexOf('    function showSuccess('));
 async function submit(fail=false,testMode=false) {
   const saved=[];
-  const c={cart:[items[0]],sending:false,testMode,navigator:{onLine:true},orderingMessage:()=>'',confirm:()=>true,localStorage:{getItem:()=>null,setItem(){},removeItem(){}},pendingKey:'pending',seatToken:'test',data:{table_id:1},orderChannel:'qr',$:()=>({}),Machi:{createId:()=> 'id',api:async()=>{if(fail)throw Error('network');return {order_id:1}}},rememberOrderedItems:items=>saved.push(items),pinAlcoholAfterOrder(){},saveCart(){},updateCart(){},showSuccess(){},showAmbiguousFailure(){},showPendingWarning(){}};
+  const c={cart:[items[0]],sending:false,testMode,navigator:{onLine:true},orderingMessage:()=>'',confirm:()=>true,localStorage:{getItem:()=>null,setItem(){},removeItem(){}},pendingKey:'pending',seatToken:'test',data:{table_id:1},orderChannel:'qr',$:()=>({querySelectorAll:()=>[]}),Machi:{createId:()=> 'id',api:async()=>{if(fail)throw Error('network');return {order_id:1}}},rememberOrderedItems:items=>saved.push(items),pinAlcoholAfterOrder(){},saveCart(){},updateCart(){},showSuccess(){},showAmbiguousFailure(){},showPendingWarning(){}};
   vm.createContext(c);vm.runInContext(html.slice(html.indexOf('    function orderDestination()'),html.indexOf('    function seatReview()')) + orderSource,c);await c.order();return saved;
 }
 assert.equal((await submit()).length,1);
