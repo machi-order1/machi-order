@@ -357,7 +357,11 @@
       if (!current) return;
       if (isTopping(current)) return showToppingTargets(current);
       selected = {};
-      productGroups(current).forEach((group) => selected[group.id] = []);
+      productGroups(current).forEach((group) => {
+        const normal = Number(current.category_id) === 1 && /^麺量/.test(group.name)
+          ? (group.options || []).find(option => option.name === '普通' && option.available !== false) : null;
+        selected[group.id] = normal ? [Number(normal.id)] : [];
+      });
       quantity = 1;
       drawProduct();
     }
@@ -469,6 +473,9 @@
       $('close-modal').onclick = editingItem ? showCart : closeModal;
     }
     function toggleOption(groupId, optionId) {
+      const group = productGroups(current).find(item => Number(item.id) === Number(groupId));
+      // Noodle sizes behave as radio choices: tapping the selected size keeps it selected.
+      if (group && /^麺量/.test(group.name) && Number(group.max_select || 1) === 1 && (selected[groupId] || []).includes(Number(optionId))) return;
       const top = $('modal').querySelector('.product-scroll').scrollTop;
       const left = $('modal').querySelector('.topping-strip')?.scrollLeft || 0;
       if (!CustomerOptions.toggle(productGroups(current), selected, groupId, optionId)) return;
