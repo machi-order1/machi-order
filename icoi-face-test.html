@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#a92c4c">
+  <title>icoi｜顔認証テスト</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#faf6f4;color:#292025;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}header{padding:26px 18px 18px;background:#a92c4c;color:white}header small{font-weight:750;letter-spacing:.12em}h1{font-size:29px;margin:7px 0 4px}main{max-width:650px;margin:auto;padding:16px 15px 54px}.notice{background:#fff1d8;border:1px solid #e5c36d;border-radius:14px;padding:13px 15px;font-weight:700;line-height:1.5}.card{background:white;border:1px solid #e8dfe2;border-radius:20px;padding:20px;margin-top:15px;box-shadow:0 6px 22px #4b24310a}h2{font-size:23px;margin:0 0 10px}.help{color:#645d61;line-height:1.55;margin:0 0 15px}.field{width:100%;font-size:20px;border:1px solid #cabfc4;border-radius:12px;padding:14px;margin-bottom:12px}button{width:100%;min-height:60px;border:0;border-radius:14px;font-size:21px;font-weight:800;background:#a92c4c;color:#fff}button:disabled{opacity:.5}.secondary{background:#fff;border:2px solid #a92c4c;color:#a92c4c;margin-top:10px}.quiet{background:transparent;color:#635d60;font-size:16px;min-height:48px;text-decoration:underline;margin-top:10px}.preview{position:relative;overflow:hidden;border-radius:15px;background:#161216;margin:12px 0}.preview video{display:block;width:100%;height:min(58vw,350px);object-fit:cover;transform:scaleX(-1)}.preview span{position:absolute;bottom:10px;left:10px;color:white;background:#181017b8;border-radius:8px;padding:7px 11px;font-size:15px}.result{padding:17px;border-radius:15px;background:#f4eff0;line-height:1.55;margin:14px 0;font-weight:700;min-height:58px}.result.good{background:#e8f7ec;color:#15623b}.result.bad{background:#fff0ee;color:#a32826}.hide{display:none!important}.clock{font-variant-numeric:tabular-nums;font-size:17px;color:#686065;text-align:center;margin-top:17px}
+  </style>
+</head>
+<body>
+  <header><small>MissMrs.BAR icoi</small><h1>顔認証テスト</h1><div>icoiのタブレットで試す画面</div></header>
+  <main>
+    <div class="notice">これは動作確認用です。出勤・退勤や給与には記録されません。</div>
+    <section class="card">
+      <h2 id="title">まず、顔を登録</h2>
+      <p class="help" id="instructions">このタブレットでカメラを許可して、顔を3回読み取ります。顔写真も特徴データもサーバーには送らず、この画面を閉じると消えます。</p>
+      <label for="name">表示する名前</label>
+      <input id="name" class="field" maxlength="30" autocomplete="off" placeholder="例：かっちゃん">
+      <div class="preview hide" id="preview"><video id="video" autoplay playsinline muted></video><span>顔が中央に映るようにしてください</span></div>
+      <div class="result hide" id="result" role="status" aria-live="polite"></div>
+      <button id="register">顔を登録する</button>
+      <button id="try" class="secondary hide">顔で照合してみる</button>
+      <button id="retry" class="secondary hide">もう一度、顔で照合</button>
+      <button id="manual" class="secondary hide">顔を読めないので名前で続ける</button>
+      <button id="clear" class="quiet hide">最初からやり直す</button>
+    </section>
+    <div class="clock" id="clock"></div>
+  </main>
+  <script src="/vendor/face-api/face-api.min.js"></script>
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      let templates = null, storedName = '', stream = null, busy = false, modelsLoading = null, stopped = false;
+      const show = (id, on) => $(id).classList.toggle('hide', !on);
+      function message(text, kind = '') {
+        $('result').textContent = text;
+        $('result').className = 'result' + (kind ? ' ' + kind : '');
+      }
+      function setBusy(value) {
+        busy = value;
+        ['register','try','retry','manual','clear'].forEach(id => $(id).disabled = value);
+      }
+      function closeCamera() {
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        $('video').srcObject = null;
+        show('preview', false);
+      }
+      function timeout(promise, ms) {
+        let timer;
+        return Promise.race([promise, new Promise((_, reject) => {
+          timer = setTimeout(() => reject(Error('timeout')), ms);
+        })]).finally(() => clearTimeout(timer));
+      }
+      function loadModels() {
+        if (!modelsLoading) modelsLoading = Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri('/vendor/face-api/models'),
+          faceapi.nets.faceLandmark68TinyNet.loadFromUri('/vendor/face-api/models'),
+          faceapi.nets.faceRecognitionNet.loadFromUri('/vendor/face-api/models'),
+        ]).catch(error => { modelsLoading = null; throw error; });
+        return modelsLoading;
+      }
+      async function openCamera() {
+        if (!navigator.mediaDevices?.getUserMedia) throw Error('camera');
+        let abandoned = false;
+        const requested = navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:480}}});
+        requested.then(value => { if (abandoned || stopped) value.getTracks().forEach(track => track.stop()); }).catch(() => {});
+        try { stream = await timeout(requested, 10000); }
+        catch (error) { abandoned = true; throw error; }
+        if (stopped) throw Error('camera');
+        $('video').srcObject = stream;
+        show('preview', true);
+        await timeout($('video').play(), 5000);
+      }
+      async function oneFace(ms = 3500) {
+        const end = Date.now() + ms;
+        while (Date.now() < end && !stopped) {
+          const remaining = Math.max(100, end - Date.now());
+          const faces = await timeout(faceapi.detectAllFaces($('video'),
+            new faceapi.TinyFaceDetectorOptions({inputSize:224,scoreThreshold:.6}))
+            .withFaceLandmarks(true).withFaceDescriptors(), remaining);
+          if (faces.length > 1) throw Error('multiple');
+          if (faces.length === 1) return Array.from(faces[0].descriptor);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        throw Error('timeout');
+      }
+      function explain(error) {
+        if (error.message === 'multiple') return '二人以上映っています。一人だけで試してください。';
+        if (error.message === 'camera' || error.name === 'NotAllowedError') return 'カメラを使えませんでした。ブラウザのカメラ許可を確認してください。';
+        if (error.message === 'timeout') return '時間内に顔を読み取れませんでした。明るい場所で正面を向いて、もう一度試してください。';
+        return '読み取りを始められませんでした。通信を確認してもう一度試してください。';
+      }
+      async function register() {
+        if (busy) return;
+        const name = $('name').value.trim();
+        if (!name) { message('先に表示する名前を入れてください。','bad'); $('name').focus(); return; }
+        setBusy(true); stopped = false; templates = null;
+        message('顔認識の準備中です。初回は少し時間がかかる場合があります。');
+        try {
+          await timeout(loadModels(), 15000);
+          await openCamera();
+          const samples = [];
+          for (let i = 0; i < 3; i++) {
+            message(`顔の読み取り ${i+1}/3。正面を向いてください。`);
+            samples.push(await oneFace());
+            await new Promise(resolve => setTimeout(resolve, 350));
+          }
+          if (samples.slice(1).some(sample => Math.hypot(...sample.map((x,i) => x-samples[0][i])) > .4))
+            throw Error('different');
+          templates = samples; storedName = name;
+          $('name').readOnly = true;
+          $('title').textContent = '登録できました';
+          $('instructions').textContent = '次のボタンを押して、もう一度カメラに顔を向けてください。';
+          show('register',false); show('try',true); show('clear',true);
+          message(`${name}さんの顔を、この画面内だけで登録しました。`, 'good');
+        } catch(error) {
+          message(error.message === 'different' ? '3回の顔が一致しませんでした。正面からもう一度登録してください。' : explain(error),'bad');
+        } finally { closeCamera(); setBusy(false); }
+      }
+      async function identify() {
+        if (busy || !templates) return;
+        setBusy(true); stopped = false;
+        show('retry',false); show('manual',false);
+        message('顔認識の準備中です。');
+        try {
+          await timeout(loadModels(), 15000);
+          await openCamera();
+          message('正面を向いてください。約3秒で判定します。');
+          const probe = await oneFace(3000);
+          const best = Math.min(...templates.map(sample => Math.hypot(...probe.map((x,i) => x-sample[i]))));
+          if (best <= .45) message(`${storedName}さん、顔を確認できました。テスト成功！`, 'good');
+          else { message('登録した顔との一致を確認できませんでした。名前で続けることもできます。','bad');show('manual',true); }
+        } catch (error) {
+          message(explain(error) + ' 名前で続けることもできます。','bad');
+          show('manual',true);
+        } finally { closeCamera(); show('retry',true); show('try',false); setBusy(false); }
+      }
+      function clear() {
+        if (busy) return;
+        closeCamera(); templates = null; storedName = '';
+        $('name').readOnly = false; $('name').value = '';
+        $('title').textContent = 'まず、顔を登録';
+        $('instructions').textContent = 'このタブレットでカメラを許可して、顔を3回読み取ります。顔写真も特徴データもサーバーには送らず、この画面を閉じると消えます。';
+        $('result').className = 'result hide';
+        show('register',true);show('try',false);show('retry',false);show('manual',false);show('clear',false);
+      }
+      $('register').onclick = register;
+      $('try').onclick = identify;
+      $('retry').onclick = identify;
+      $('manual').onclick = () => {
+        message(`${storedName}さん、名前で進む動作を確認できました。実際の勤怠には記録されません。`,'good');
+        show('manual',false);
+      };
+      $('clear').onclick = clear;
+      document.addEventListener('visibilitychange',() => { if(document.hidden){stopped=true;closeCamera();} });
+      window.addEventListener('pagehide',() => {stopped=true;closeCamera();templates=null;});
+      setInterval(() => { $('clock').textContent = new Date().toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}); },1000);
+    })();
+  </script>
+</body>
+</html>
