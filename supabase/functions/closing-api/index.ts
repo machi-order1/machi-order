@@ -22,13 +22,19 @@ Deno.serve(async (request: Request) => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date())
     const date = parsed.searchParams.get('date') || today
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return O({ error: '営業日が正しくありません' }, 400)
-    const { data: orders, error: orderError } = await sb.from('orders').select('id,total,gross_total,discount_total,payment_method,payment_status,guest_count,order_channel_code').eq('store_id', storeId).eq('business_date', date).neq('status', 'cancelled')
+    const { data: orders, error: orderError } = await sb.from('orders').select('id,total,gross_total,discount_total,payment_method,payment_status,guest_count,check_group_id,order_channel_code').eq('store_id', storeId).eq('business_date', date).neq('status', 'cancelled')
     if (orderError) throw orderError
     const paid = (orders || []).filter((row: any) => row.payment_status === 'paid')
     const sum = (rows: any[], key = 'total') => rows.reduce((total: number, row: any) => total + Number(row[key] || 0), 0)
     const net = sum(paid), gross = paid.reduce((total: number, row: any) => total + Number(row.gross_total ?? row.total ?? 0), 0), discount = sum(paid, 'discount_total')
     const cash = sum(paid.filter((row: any) => row.payment_method === 'cash')), paypay = sum(paid.filter((row: any) => row.payment_method === 'paypay')), other = net - cash - paypay
-    const guests = paid.reduce((total: number, row: any) => total + Number(row.guest_count || 1), 0)
+    // Additional orders in one visit do not represent additional guests.
+    const guestGroups = new Map<string, number>()
+    for (const row of paid) {
+      const key = row.check_group_id ? `group:${row.check_group_id}` : `order:${row.id}`
+      guestGroups.set(key, Math.max(guestGroups.get(key) || 0, Number(row.guest_count || 1)))
+    }
+    const guests = [...guestGroups.values()].reduce((total, count) => total + count, 0)
     const channelSales: Record<string, number> = {}
     for (const row of paid) { const key = row.order_channel_code || 'dine_in'; channelSales[key] = (channelSales[key] || 0) + Number(row.total || 0) }
     const { data: drawer } = await sb.from('cash_drawer_sessions').select('*').eq('store_id', storeId).eq('business_date', date).order('opened_at', { ascending: false }).limit(1).maybeSingle()
