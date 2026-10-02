@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { summarize, comparison, yearOverYear, csvCell } from '../supabase/functions/financial-report-api/metrics.ts'
 
-const row = (year, month, sales, orders = 1) => ({ month: `${year}-${String(month).padStart(2, '0')}-01`, sales, order_count: orders, guest_count: orders * 2,
+const row = (year, month, sales, orders = 1) => ({ month: `${year}-${String(month).padStart(2, '0')}-01`, sales, order_count: orders, visit_count: orders, guest_count: orders * 2,
   estimated_cogs: 20, uncosted_items: 1, labor: 10, expenses: 5, waste: 2, staff_consumption: 1, channel_fees: 3,
   expense_categories: { 家賃: 5 }, expense_count: 1, closed_days: 1, unknown_tax_count: 1, missing_vendor_count: 0, missing_evidence_count: 1 })
 const rows = [row(2025, 8, 100), row(2026, 8, 120), row(2025, 9, 200), row(2026, 9, 300), row(2025, 10, 999)]
@@ -9,6 +9,8 @@ const august = comparison(rows, 2026, 8)
 assert.equal(august.projection.flat, 120)
 assert.equal(august.projection.trend, 140)
 assert.equal(august.projection.change_percent, 20)
+assert.equal(august.projection.visit_change_percent, 0)
+assert.equal(august.projection.average_visit_current, 120)
 assert.equal(comparison([row(2026, 8, 120)], 2026, 8).projection, null)
 assert.equal(comparison([row(2025, 8, 100), row(2026, 8, 120, 0)], 2026, 8).projection, null)
 const yoy = yearOverYear(rows, 2026, '2026-10-03')
