@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,content-type,apikey', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } })
-type Month = { month: string; sales: number; order_count: number; guest_count: number; estimated_cogs: number; labor: number; expenses: number; waste: number; staff_consumption: number; channel_fees: number; expense_categories: Record<string, number>; expense_count: number; unknown_tax_count: number; missing_vendor_count: number; missing_evidence_count: number }
+type Month = { month: string; sales: number; order_count: number; guest_count: number; estimated_cogs: number; uncosted_items: number; labor: number; expenses: number; waste: number; staff_consumption: number; channel_fees: number; expense_categories: Record<string, number>; expense_count: number; unknown_tax_count: number; missing_vendor_count: number; missing_evidence_count: number }
 const n = (x: unknown) => Number(x || 0)
 const monthKey = (s: string) => s.slice(0, 7)
 function summarize(rows: Month[]) {
@@ -11,7 +11,7 @@ function summarize(rows: Month[]) {
   for (const row of rows) for (const [key, value] of Object.entries(row.expense_categories || {})) categories[key] = (categories[key] || 0) + n(value)
   const sales = total('sales'), cogs = total('estimated_cogs'), labor = total('labor'), expenses = total('expenses'), waste = total('waste'), staff = total('staff_consumption'), fees = total('channel_fees')
   const profit = sales - cogs - labor - expenses - waste - staff - fees
-  return { sales, order_count: total('order_count'), guest_count: total('guest_count'), estimated_cogs: cogs, labor, expenses, waste, staff_consumption: staff, channel_fees: fees,
+  return { sales, order_count: total('order_count'), guest_count: total('guest_count'), estimated_cogs: cogs, uncosted_items: total('uncosted_items'), labor, expenses, waste, staff_consumption: staff, channel_fees: fees,
     estimated_gross_profit: sales - cogs, estimated_profit: profit, margin: sales ? Math.round(profit / sales * 1000) / 10 : 0,
     labor_ratio: sales ? Math.round(labor / sales * 1000) / 10 : 0, expense_categories: categories,
     expense_count: total('expense_count'), unknown_tax_count: total('unknown_tax_count'), missing_vendor_count: total('missing_vendor_count'), missing_evidence_count: total('missing_evidence_count') }
@@ -93,7 +93,7 @@ Deno.serve(async request => {
       const comparable = Boolean(last?.orders && prior?.orders)
       return { month: mm, history, next_year: year + 1, projection: comparable ? { flat: last!.sales, trend: Math.max(0, 2 * last!.sales - prior!.sales), change_percent: prior!.sales ? Math.round((last!.sales / prior!.sales - 1) * 1000) / 10 : null, method: '直近２回の同月実績を直線で延長した参考シナリオ' } : null }
     })
-    return json({ store_id: storeId, year, span, comparisons, basis: 'tax_inclusive_management_estimate', months: selectedMonths.map(row => ({ ...row, estimated_profit: n(row.sales)-n(row.estimated_cogs)-n(row.labor)-n(row.expenses)-n(row.waste)-n(row.staff_consumption)-n(row.channel_fees) })), years, selected, yoy_sales_percent: yoy,
+    return json({ store_id: storeId, year, span, comparisons, can_edit: ['owner','admin','manager'].includes(member.role), basis: 'tax_inclusive_management_estimate', months: selectedMonths.map(row => ({ ...row, estimated_profit: n(row.sales)-n(row.estimated_cogs)-n(row.labor)-n(row.expenses)-n(row.waste)-n(row.staff_consumption)-n(row.channel_fees) })), years, selected, yoy_sales_percent: yoy,
       notes: ['売上は会計済み注文の税込総額です。','商品原価と販売手数料は現在の登録値による概算で、購入・棚卸・過去の条件変更を反映しません。','仕入、廃棄、賄いの二重計上や未入力経費の確認が必要です。','正式な損益計算書や税務申告書ではありません。'] })
   } catch (error) { console.error(error); return json({ error: '財務データを取得できませんでした' }, 500) }
 })
