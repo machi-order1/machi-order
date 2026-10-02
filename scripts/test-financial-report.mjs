@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { summarize, comparison, yearOverYear, csvCell } from '../supabase/functions/financial-report-api/metrics.ts'
+import { summarize, comparison, yearOverYear, guideBusiness, csvCell } from '../supabase/functions/financial-report-api/metrics.ts'
 
 const row = (year, month, sales, orders = 1) => ({ month: `${year}-${String(month).padStart(2, '0')}-01`, sales, order_count: orders, visit_count: orders, guest_count: orders * 2,
   estimated_cogs: 20, uncosted_items: 1, labor: 10, expenses: 5, waste: 2, staff_consumption: 1, channel_fees: 3,
@@ -24,4 +24,11 @@ assert.equal(total.expense_categories['家賃'], 10)
 assert.equal(total.uncosted_items, 2)
 assert(csvCell('=HYPERLINK("x")').startsWith('"\'='))
 assert.equal(csvCell('123'), '"123"')
+const empty = guideBusiness([], 2026, '2026-10-03')
+assert.equal(empty[0].destination, 'sales')
+const incomplete = guideBusiness(rows, 2026, '2026-10-03')
+assert.equal(incomplete[0].destination, 'cost')
+assert.equal(incomplete[1].destination, 'expenses')
+const falling = [row(2025, 8, 200, 4), row(2026, 8, 100, 2)].map(item => ({ ...item, uncosted_items: 0, unknown_tax_count: 0, missing_evidence_count: 0 }))
+assert(guideBusiness(falling, 2026, '2026-10-03').some(item => item.destination === 'comparison'))
 console.log('PASS annual totals, prior-year periods, seasonal scenarios, missing data and CSV cells')
