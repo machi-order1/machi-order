@@ -27,7 +27,7 @@
   <nav class="mo-appnav"><a href="/store-command.html"><b>⌂</b>ホーム</a><a href="/kitchen.html"><b>🍳</b>厨房</a><a href="/today.html"><b>✓</b>今日</a><a class="active" href="/cashier.html"><b>¥</b>会計</a><a href="/staff.html"><b>☰</b>その他</a></nav>
   <script>
     const API='https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/cashier-api?store_id=1',AUTH='https://tejglrlkaqolbghoagqj.supabase.co/auth/v1/token',KEY='sb_publishable_beZla85Y6Ngrx0hji9I9rg_FbcRSUoT';
-    let busy=new Set(),orders=[],toastTimer,currentMode='pending',toastCallback=null;
+    let busy=new Set(),orders=[],toastTimer,currentMode='pending',toastCallback=null,loadGeneration=0,loadedMode=null;
     const app=document.getElementById('app'),statusNode=document.getElementById('status'),toast=document.getElementById('toast'),toastMessage=document.getElementById('toast-message'),toastAction=document.getElementById('toast-action'),historyTools=document.getElementById('history-tools'),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),yen=n=>'¥'+Number(n||0).toLocaleString('ja-JP');
     function showToast(message,action=null){toastMessage.textContent=message;toastCallback=action;toastAction.hidden=!action;toastAction.disabled=false;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast.classList.remove('show');toastCallback=null},action?10000:4200)}
     function rawToken(){return localStorage.getItem('machi_access_token')||localStorage.getItem('mo_staff_token')||localStorage.getItem('access_token')||localStorage.getItem('sb_access_token')||''}
@@ -43,23 +43,89 @@
     function pickupTime(value){return value?new Date(value).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'時刻未設定'}
     function takeoutMeta(order){const info=takeoutInfo(order);if(order.order_channel_code!=='takeout'||!info)return'';const phone=String(info.phone||''),href=phone.replace(/[^0-9+]/g,'');return`<div class="takeout-meta"><b>🥡 受取 ${esc(pickupTime(info.pickup_at))}</b><br>${esc(info.customer_name||'お名前未設定')}${phone?` · <a href="tel:${esc(href)}">${esc(phone)}</a>`:''}</div>`}
     function withinUndo(order){return order.paid_at&&Date.now()-new Date(order.paid_at).getTime()<=5*60_000}
-    function visibleHistory(){const query=document.getElementById('history-search').value.trim().toLowerCase(),method=document.getElementById('payment-filter').value;return orders.filter(order=>{const info=takeoutInfo(order),haystack=[order.id,order.receipt_number,order.dining_tables?.name,info?.customer_name,info?.phone].join(' ').toLowerCase();return(!query||haystack.includes(query))&&(!method||order.payment_method===method)})}
+    function visibleHistory(){
+      const query=document.getElementById('history-search').value.trim().toLowerCase(),method=document.getElementById('payment-filter').value;
+      const matches=new Set(orders.filter(order=>{const info=takeoutInfo(order),haystack=[order.id,order.check_group_id,order.receipt_number,order.dining_tables?.name,info?.customer_name,info?.phone].join(' ').toLowerCase();return(!query||haystack.includes(query))&&(!method||order.payment_method===method)}).map(o=>o.check_group_id||'o:'+o.id));
+      return orders.filter(o=>matches.has(o.check_group_id||'o:'+o.id));
+    }
+    function checkoutCards(list){
+      const cards=new Map();
+      list.forEach(order=>{
+        const key=order.check_group_id?'g:'+order.check_group_id:'o:'+order.id;
+        if(!cards.has(key))cards.set(key,{id:order.check_group_id||order.id,group:Boolean(order.check_group_id),orders:[],total:0,first:order});
+        const card=cards.get(key);card.orders.push(order);card.total+=Number(order.total||0);
+      });
+      return [...cards.values()];
+    }
     function render(){
+      if(loadedMode!==currentMode)return;
       historyTools.classList.toggle('show',currentMode==='history');
       const list=currentMode==='history'?visibleHistory():orders;
-      const total=list.reduce((sum,order)=>sum+Number(order.total||0),0);
-      statusNode.textContent=currentMode==='history'?`本日の会計済み ${list.length}件・${yen(total)}`:`未会計 ${orders.length}件・${yen(total)}`;
-      if(!list.length){app.innerHTML=currentMode==='history'?'<div class="empty"><b>該当する会計履歴がありません</b>席名・注文番号・レシート番号で検索できます</div>':'<div class="empty"><b>未会計はありません</b>会計待ちの注文がここに表示されます</div>';return}
-      app.innerHTML=list.map(o=>`<section class="card"><div class="meta"><div><div class="seat">${esc(displaySeat(o))}</div><div class="orderid">注文 #${o.id}${o.receipt_number?' · '+esc(o.receipt_number):''}</div><div class="order-source ${sourceClass(o)}">${sourceLabel(o)}</div>${currentMode==='history'?`<div class="paidmeta">${paidTime(o.paid_at)} · ${paymentLabel(o.payment_method)}</div>`:''}</div><div class="total">${yen(o.total)}</div></div>${takeoutMeta(o)}<div class="items">${(o.order_items||[]).map(i=>`<div class="item"><div class="iname">${esc(i.product_name_snapshot)} ×${Number(i.quantity||0)}</div>${(i.order_item_options||[]).length?`<div class="opts">${i.order_item_options.map(z=>esc(z.option_name_snapshot)).join('・')}</div>`:''}</div>`).join('')}</div>${currentMode==='history'?(withinUndo(o)?`<div class="history-actions"><button class="undo-pay" data-undo="${o.id}" ${busy.has(o.id)?'disabled':''}>${busy.has(o.id)?'処理中…':'会計完了を取り消す'}</button></div>`:''):`<div class="pay"><button class="cash" data-id="${o.id}" data-method="cash" ${busy.has(o.id)?'disabled':''}>${busy.has(o.id)?'処理中…':'現金を受け取りました'}<small>会計完了</small></button><button class="pp" data-id="${o.id}" data-method="paypay" ${busy.has(o.id)?'disabled':''}>${busy.has(o.id)?'処理中…':'PayPay入金確認済み'}<small>会計完了</small></button></div>`}</section>`).join('');
-      document.querySelectorAll('.pay button').forEach(button=>button.addEventListener('click',()=>pay(Number(button.dataset.id),button.dataset.method)));
+      const cards=checkoutCards(list),total=list.reduce((sum,order)=>sum+Number(order.total||0),0);
+      statusNode.textContent=currentMode==='history'?`本日の会計済み ${cards.length}組・${yen(total)}`:`未会計 ${cards.length}組・${yen(total)}`;
+      if(!cards.length){app.innerHTML=currentMode==='history'?'<div class="empty"><b>該当する会計履歴がありません</b>席名・注文番号で検索できます</div>':'<div class="empty"><b>未会計はありません</b>会計待ちの注文がここに表示されます</div>';return}
+      app.innerHTML=cards.map(card=>{
+        const o=card.first,key=card.group?'g:'+card.id:card.id,locked=busy.has(key),label=card.group?`来店会計 · 注文${card.orders.length}件`:`注文 #${o.id}`;
+        const items=card.orders.map(order=>`${card.group?`<div class="orderid">注文 #${order.id}</div>`:''}${(order.order_items||[]).map(i=>`<div class="item"><div class="iname">${esc(i.product_name_snapshot)} ×${Number(i.quantity||0)}</div>${(i.order_item_options||[]).length?`<div class="opts">${i.order_item_options.map(z=>esc(z.option_name_snapshot)).join('・')}</div>`:''}</div>`).join('')}`).join('');
+        const buttons=currentMode==='history'?(withinUndo(o)?`<div class="history-actions"><button class="undo-pay" ${card.group?`data-undo-group="${card.id}"`:`data-undo="${o.id}"`} ${locked?'disabled':''}>${locked?'処理中…':'会計完了を取り消す'}</button></div>`:''):`<div class="pay"><button class="cash" ${card.group?`data-group="${card.id}"`:`data-id="${o.id}"`} data-method="cash" ${locked?'disabled':''}>${locked?'処理中…':'現金を受け取りました'}<small>会計完了</small></button><button class="pp" ${card.group?`data-group="${card.id}"`:`data-id="${o.id}"`} data-method="paypay" ${locked?'disabled':''}>${locked?'処理中…':'PayPay入金確認済み'}<small>会計完了</small></button></div>`;
+        return `<section class="card"><div class="meta"><div><div class="seat">${esc(displaySeat(o))}</div><div class="orderid">${label}</div><div class="order-source ${sourceClass(o)}">${sourceLabel(o)}</div>${currentMode==='history'?`<div class="paidmeta">${paidTime(o.paid_at)} · ${paymentLabel(o.payment_method)}</div>`:''}</div><div class="total">${yen(card.total)}</div></div>${takeoutMeta(o)}<div class="items">${items}</div>${buttons}</section>`;
+      }).join('');
+      document.querySelectorAll('.pay button').forEach(button=>button.addEventListener('click',()=>button.dataset.group?payGroup(Number(button.dataset.group),button.dataset.method):pay(Number(button.dataset.id),button.dataset.method)));
       document.querySelectorAll('[data-undo]').forEach(button=>button.addEventListener('click',()=>undoPayment(Number(button.dataset.undo))));
+      document.querySelectorAll('[data-undo-group]').forEach(button=>button.addEventListener('click',()=>undoGroup(Number(button.dataset.undoGroup))));
     }
-    async function load(){const t=await token();if(!t){statusNode.textContent='未ログイン';app.innerHTML='<div class="empty"><b>ログインが必要です</b>長浜店のスタッフアカウントでログインしてください。<br><a href="/login.html?next=/cashier.html">ログイン画面を開く</a></div>';return}try{const r=await fetch(API+'&mode='+currentMode,{headers:{Authorization:'Bearer '+t}}),j=await r.json();if(r.status===401){clearSession();location.replace('/login.html?next=/cashier.html');return}if(!r.ok)throw Error(j.error||'会計情報を取得できません');orders=j.orders||[];render()}catch(e){statusNode.textContent='再接続中';if(!orders.length)app.innerHTML='<div class="empty"><b>会計情報を取得できません</b>'+esc(e.message)+'<br>自動で再接続します</div>'}}
+    async function load(){
+      const generation=++loadGeneration,mode=currentMode;
+      const t=await token();
+      if(generation!==loadGeneration||mode!==currentMode)return;
+      if(!t){loadedMode=null;statusNode.textContent='未ログイン';app.innerHTML='<div class="empty"><b>ログインが必要です</b>スタッフアカウントでログインしてください。<br><a href="/login.html?next=/cashier.html">ログイン画面を開く</a></div>';return}
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+      try{
+        const r=await fetch(API+'&mode='+mode,{headers:{Authorization:'Bearer '+t},signal:controller.signal}),j=await r.json();
+        if(generation!==loadGeneration||mode!==currentMode)return;
+        if(r.status===401){clearSession();location.replace('/login.html?next=/cashier.html');return}
+        if(!r.ok)throw Error(j.error||'会計情報を取得できません');
+        if(!Array.isArray(j.orders))throw Error('会計情報の形式を確認できません');
+        orders=j.orders;loadedMode=mode;render();
+      }catch(e){
+        if(generation!==loadGeneration||mode!==currentMode)return;
+        loadedMode=null;statusNode.textContent='再接続中';
+        app.innerHTML='<div class="empty"><b>会計情報を取得できません</b>通信を確認しています。自動で再接続します</div>';
+      }finally{clearTimeout(timer)}
+    }
     async function apiPost(body){const r=await fetch(API,{method:'POST',headers:{Authorization:'Bearer '+await token(),'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json().catch(()=>({}));if(r.status===401){clearSession();location.replace('/login.html?next=/cashier.html');throw Error('ログインしてください')}if(!r.ok)throw Error(j.error||'会計を更新できません');return j}
-    async function pay(id,method){if(busy.has(id))return;const order=orders.find(o=>Number(o.id)===id),amount=yen(order?.total),seat=order?displaySeat(order):'注文 #'+id;const question=method==='cash'?`${seat}：お客様から ${amount} を受け取りましたか？\n\nOK後は会計完了になります。`:`${seat}：PayPay側で ${amount} の入金を確認しましたか？\n\n支払い画面だけでなく、入金済みを確認してからOKを押してください。`;if(!confirm(question))return;busy.add(id);render();try{await apiPost({action:'complete_payment',order_id:id,payment_method:method});showToast(`${seat} ${amount}｜${paymentLabel(method)}会計を完了しました`,()=>undoPayment(id,{seat,amount,method}));await load()}catch(e){alert(e.message);await load()}finally{busy.delete(id);render()}}
-    async function undoPayment(id,known=null){if(busy.has(id))return;const order=known||orders.find(o=>Number(o.id)===id)||{},seat=known?.seat||displaySeat(order)||'注文 #'+id,amount=known?.amount||yen(order.total),method=known?.method||order.payment_method;const note=method==='paypay'?'\n\n重要：PayPayの返金は自動では行われません。これはMACHI ORDER上の会計表示だけを未会計へ戻します。':'\n\n現金の受け渡しは別途確認してください。';if(!confirm(`${seat} ${amount} の会計完了を取り消しますか？${note}`))return;busy.add(id);render();try{const result=await apiPost({action:'undo_payment',order_id:id});toast.classList.remove('show');showToast(result.external_refund_required?'未会計へ戻しました。PayPay返金は別途必要です':'未会計へ戻しました');currentMode='pending';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.mode==='pending'));await load()}catch(e){alert(e.message);await load()}finally{busy.delete(id);render()}}
+    async function pay(id,method){if(busy.has(id)||loadedMode!=='pending'||currentMode!=='pending')return;const order=orders.find(o=>Number(o.id)===id);if(!order)return;const amount=yen(order?.total),seat=order?displaySeat(order):'注文 #'+id;const question=method==='cash'?`${seat}：お客様から ${amount} を受け取りましたか？\n\nOK後は会計完了になります。`:`${seat}：PayPay側で ${amount} の入金を確認しましたか？\n\n支払い画面だけでなく、入金済みを確認してからOKを押してください。`;if(!confirm(question))return;busy.add(id);render();try{const result=await apiPost({action:'complete_payment',order_id:id,payment_method:method});if(result.already_paid){showToast(`${seat} ${yen(result.total)}｜すでに${paymentLabel(result.payment_method)}で会計済みです`)}else showToast(`${seat} ${amount}｜${paymentLabel(method)}会計を完了しました`,()=>undoPayment(id,{seat,amount,method}));await load()}catch(e){alert(e.message);await load()}finally{busy.delete(id);if(loadedMode===currentMode)render()}}
+    async function undoPayment(id,known=null){if(busy.has(id))return;if(!known&&(loadedMode!=='history'||currentMode!=='history'))return;const order=known||orders.find(o=>Number(o.id)===id);if(!order)return;const seat=known?.seat||displaySeat(order)||'注文 #'+id,amount=known?.amount||yen(order.total),method=known?.method||order.payment_method;const note=method==='paypay'?'\n\n重要：PayPayの返金は自動では行われません。これはMACHI ORDER上の会計表示だけを未会計へ戻します。':'\n\n現金の受け渡しは別途確認してください。';if(!confirm(`${seat} ${amount} の会計完了を取り消しますか？${note}`))return;busy.add(id);render();try{const result=await apiPost({action:'undo_payment',order_id:id});toast.classList.remove('show');showToast(result.external_refund_required?'未会計へ戻しました。PayPay返金は別途必要です':'未会計へ戻しました');currentMode='pending';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.mode==='pending'));await load()}catch(e){alert(e.message);await load()}finally{busy.delete(id);if(loadedMode===currentMode)render()}}
+    async function payGroup(id,method){
+      const key='g:'+id;if(busy.has(key)||loadedMode!=='pending'||currentMode!=='pending')return;
+      const card=checkoutCards(orders).find(x=>x.group&&Number(x.id)===id);if(!card)return;
+      const seat=displaySeat(card.first),amount=yen(card.total),count=card.orders.length;
+      const question=method==='cash'?`${seat}：注文${count}件、合計${amount}を受け取りましたか？`:`${seat}：注文${count}件、合計${amount}のPayPay入金済みを確認しましたか？`;
+      if(!confirm(question))return;
+      busy.add(key);render();
+      try{const result=await apiPost({action:'complete_group_payment',group_id:id,payment_method:method,
+        expected_order_ids:card.orders.map(o=>Number(o.id)).sort((a,b)=>a-b),expected_total:card.total});
+        if(result.already_paid)showToast(`${seat}｜すでに${paymentLabel(result.payment_method)}で会計済みです`);
+        else showToast(`${seat} ${yen(result.total)}｜注文${result.order_count}件を会計しました`,()=>undoGroup(id,{seat,total:result.total,method}));
+        await load();
+      }catch(e){alert(e.message);await load()}finally{busy.delete(key);if(loadedMode===currentMode)render()}
+    }
+    async function undoGroup(id,known=null){
+      const key='g:'+id;if(busy.has(key))return;
+      if(!known&&(loadedMode!=='history'||currentMode!=='history'))return;
+      const card=known?null:checkoutCards(orders).find(x=>x.group&&Number(x.id)===id);
+      if(!known&&!card)return;
+      const seat=known?.seat||displaySeat(card.first),amount=yen(known?.total??card.total),method=known?.method||card.first.payment_method;
+      const note=method==='paypay'?'\nPayPayの返金は自動では行われません。返金は別途確認してください。':'';
+      if(!confirm(`${seat} ${amount} の一括会計を取り消しますか？${note}`))return;
+      busy.add(key);render();
+      try{const result=await apiPost({action:'undo_group_payment',group_id:id});
+        toast.classList.remove('show');showToast(result.external_refund_required?'未会計へ戻しました。PayPay返金は別途必要です':'未会計へ戻しました');
+        currentMode='pending';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.mode==='pending'));await load();
+      }catch(e){alert(e.message);await load()}finally{busy.delete(key);if(loadedMode===currentMode)render()}
+    }
     toastAction.addEventListener('click',async()=>{if(!toastCallback)return;const action=toastCallback;toastCallback=null;toastAction.disabled=true;await action()});
-    document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{currentMode=button.dataset.mode;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===button));orders=[];app.innerHTML='<div class="empty"><b>読み込み中</b>少しお待ちください</div>';load()}));
+    document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{currentMode=button.dataset.mode;loadedMode=null;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===button));orders=[];app.innerHTML='<div class="empty"><b>読み込み中</b>少しお待ちください</div>';load()}));
     document.getElementById('history-search').addEventListener('input',render);document.getElementById('payment-filter').addEventListener('change',render);
     document.getElementById('logout-button').addEventListener('click',()=>{if(confirm('この端末からログアウトしますか？')){clearSession();location.replace('/login.html?next=/cashier.html')}});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});load();setInterval(()=>{if(document.visibilityState==='visible')load()},7000);if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
