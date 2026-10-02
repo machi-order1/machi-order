@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { validDescriptor, matchFace } from '../supabase/functions/attendance-kiosk-api/face-match.js';
+const face = Array(128).fill(0); face[0] = 1;
+const shifted = distance => { const x = [...face]; x[1] = distance; return x; };
+assert.equal(validDescriptor(face), true);
+for (const bad of [null,Array(127).fill(1),Array(128).fill(0),Array(128).fill(NaN),Array(128).fill(Infinity),Array(128).fill('1')]) assert.equal(validDescriptor(bad), false);
+assert.equal(matchFace(face,[]), null);
+assert.equal(matchFace(face,[{staff_id:1,descriptors:[shifted(.2),shifted(.3),shifted(.35)]}]).staff_id,1);
+assert.equal(matchFace(face,[{staff_id:1,descriptors:[shifted(.46)]}]),null);
+assert.equal(matchFace(face,[{staff_id:1,descriptors:[shifted(.2)]},{staff_id:2,descriptors:[shifted(.25)]}]),null);
+assert.equal(matchFace(face,[{staff_id:1,descriptors:[shifted(.2)]},{staff_id:2,descriptors:[shifted(.4)]}]).staff_id,1);
+assert.equal(matchFace(face,[{staff_id:1,descriptors:[null]}]),null);
+console.log('PASS: invalid descriptors, no templates, confident match, conservative rejection, ambiguous identity rejection.');
