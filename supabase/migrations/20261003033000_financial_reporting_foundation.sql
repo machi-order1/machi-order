@@ -21,7 +21,7 @@ create or replace function public.management_financial_months(p_store_id bigint,
 returns table (
   month date, sales numeric, order_count bigint, guest_count bigint, estimated_cogs numeric, uncosted_items bigint,
   labor numeric, expenses numeric, waste numeric, staff_consumption numeric, channel_fees numeric,
-  expense_categories jsonb, expense_count bigint, unknown_tax_count bigint,
+  expense_categories jsonb, expense_count bigint, closed_days bigint, unknown_tax_count bigint,
   missing_vendor_count bigint, missing_evidence_count bigint
 )
 language sql stable security invoker set search_path = 'public','pg_temp' as $report$
@@ -35,17 +35,17 @@ with months as (
   where o.store_id=p_store_id and o.business_date>=p_from and o.business_date<p_to
     and o.payment_status='paid' and o.status <> 'cancelled'
 ), revenue as (
-  select date_trunc('month',business_date)::date month,sum(total)::numeric sales,
+  select date_trunc('month',business_date)::date as month,sum(total)::numeric sales,
     count(*)::bigint order_count,sum(greatest(coalesce(guest_count,1),1))::bigint guest_count
   from paid group by 1
 ), cost as (
-  select date_trunc('month',p.business_date)::date month,
+  select date_trunc('month',p.business_date)::date as month,
     sum(oi.quantity*coalesce(pr.cost_price,0))::numeric estimated_cogs,
     count(*) filter(where pr.cost_price is null or pr.cost_price<=0)::bigint uncosted_items
   from paid p join public.order_items oi on oi.order_id=p.id
   left join public.products pr on pr.id=oi.product_id group by 1
 ), fee_groups as (
-  select date_trunc('month',business_date)::date month,
+  select date_trunc('month',business_date)::date as month,
     coalesce(order_channel_code,'dine_in') channel_code,
     case when check_group_id is null then 'o:' || id::text else 'g:' || check_group_id::text end visit_key,
     sum(total)::numeric group_sales
@@ -58,38 +58,42 @@ with months as (
   select f.month,sum(round(f.group_sales*coalesce(r.percent_fee,0)/100+coalesce(r.fixed_fee,0)))::numeric channel_fees
   from fee_groups f join fee_rules r using(channel_code) group by 1
 ), shifts as (
-  select date_trunc('month',shift_date)::date month,sum(coalesce(labor_cost,0))::numeric labor
+  select date_trunc('month',shift_date)::date as month,sum(coalesce(labor_cost,0))::numeric labor
   from public.work_shifts where store_id=p_store_id and shift_date>=p_from and shift_date<p_to group by 1
 ), exp_by_category as (
-  select date_trunc('month',expense_date)::date month,category,sum(amount)::numeric amount
+  select date_trunc('month',expense_date)::date as month,category,sum(amount)::numeric amount
   from public.store_expenses where store_id=p_store_id and expense_date>=p_from and expense_date<p_to
     and voided_at is null group by 1,2
 ), exp_categories as (
   select month,jsonb_object_agg(coalesce(category,'未分類'),amount) categories
   from exp_by_category group by month
 ), exp as (
-  select date_trunc('month',expense_date)::date month,sum(amount)::numeric expenses,
+  select date_trunc('month',expense_date)::date as month,sum(amount)::numeric expenses,
     count(*)::bigint expense_count,
     count(*) filter(where tax_category='unknown')::bigint unknown_tax_count,
     count(*) filter(where nullif(trim(vendor_name),'') is null)::bigint missing_vendor_count,
     count(*) filter(where receipt_import_id is null)::bigint missing_evidence_count
   from public.store_expenses where store_id=p_store_id and expense_date>=p_from and expense_date<p_to
     and voided_at is null group by 1
+), closings as (
+  select date_trunc('month',business_date)::date as month,count(*)::bigint closed_days
+  from public.daily_closings where store_id=p_store_id and business_date>=p_from and business_date<p_to
+  group by 1
 ), waste_rows as (
-  select date_trunc('month',business_date)::date month,sum(coalesce(cost_amount,0))::numeric waste
+  select date_trunc('month',business_date)::date as month,sum(coalesce(cost_amount,0))::numeric waste
   from public.inventory_waste where store_id=p_store_id and business_date>=p_from and business_date<p_to group by 1
 ), staff_rows as (
-  select date_trunc('month',business_date)::date month,sum(coalesce(cost_amount,0))::numeric staff_consumption
+  select date_trunc('month',business_date)::date as month,sum(coalesce(cost_amount,0))::numeric staff_consumption
   from public.staff_consumption_events where store_id=p_store_id and business_date>=p_from and business_date<p_to
     and event_type <> 'waste' group by 1
 )
 select m.month,coalesce(r.sales,0),coalesce(r.order_count,0),coalesce(r.guest_count,0),
   coalesce(c.estimated_cogs,0),coalesce(c.uncosted_items,0),coalesce(s.labor,0),coalesce(e.expenses,0),
   coalesce(w.waste,0),coalesce(sc.staff_consumption,0),coalesce(f.channel_fees,0),coalesce(ec.categories,'{}'::jsonb),
-  coalesce(e.expense_count,0),coalesce(e.unknown_tax_count,0),
+  coalesce(e.expense_count,0),coalesce(cl.closed_days,0),coalesce(e.unknown_tax_count,0),
   coalesce(e.missing_vendor_count,0),coalesce(e.missing_evidence_count,0)
 from months m left join revenue r using(month) left join cost c using(month)
-left join shifts s using(month) left join exp e using(month)
+left join shifts s using(month) left join exp e using(month) left join closings cl using(month)
 left join waste_rows w using(month) left join staff_rows sc using(month) left join fees f using(month)
 left join exp_categories ec using(month) order by m.month;
 $report$;
