@@ -67,7 +67,7 @@ Deno.serve(async (request: Request) => {
     const { data: membership } = await sb.from('store_memberships').select('role')
       .eq('user_id', user.id).eq('store_id', storeId).eq('active', true).maybeSingle()
     if (!membership || !['owner', 'admin', 'manager', 'viewer'].includes(membership.role)) return response({ error: '閲覧権限がありません' }, 403)
-    const { data: store, error: storeError } = await sb.from('stores').select('timezone').eq('id', storeId).single()
+    const { data: store, error: storeError } = await sb.from('stores').select('timezone,brand_id').eq('id', storeId).single()
     if (storeError) throw storeError
     const timezone = store?.timezone || 'Asia/Tokyo'
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -117,8 +117,8 @@ Deno.serve(async (request: Request) => {
     const gross = salesSummary.sales - cogs
     const operating = gross - expenses - labor - waste - staffConsumption - salesSummary.channel_fees
     const [{ count: activeProducts }, { count: costedProducts }, { count: uncostedStaff }] = await Promise.all([
-      sb.from('products').select('id', { count: 'exact', head: true }).eq('active', true).eq('store_id', storeId),
-      sb.from('products').select('id', { count: 'exact', head: true }).eq('active', true).eq('store_id', storeId).gt('cost_price', 0),
+      sb.from('products').select('id', { count: 'exact', head: true }).eq('active', true).eq('brand_id', store.brand_id),
+      sb.from('products').select('id', { count: 'exact', head: true }).eq('active', true).eq('brand_id', store.brand_id).gt('cost_price', 0),
       sb.from('staff_consumption_events').select('id', { count: 'exact', head: true }).eq('store_id', storeId).gte('business_date', start).lt('business_date', end).eq('cost_complete', false),
     ])
     const ratio = (value: number) => salesSummary.sales ? Math.round(value / salesSummary.sales * 1000) / 10 : 0
