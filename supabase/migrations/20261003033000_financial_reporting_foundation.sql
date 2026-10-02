@@ -20,7 +20,7 @@ create index if not exists work_shifts_store_date_finance_idx on public.work_shi
 create or replace function public.management_financial_months(p_store_id bigint,p_from date,p_to date)
 returns table (
   month date, sales numeric, order_count bigint, guest_count bigint, estimated_cogs numeric,
-  labor numeric, expenses numeric, waste numeric, staff_consumption numeric,
+  labor numeric, expenses numeric, waste numeric, staff_consumption numeric, channel_fees numeric,
   expense_categories jsonb, expense_count bigint, unknown_tax_count bigint,
   missing_vendor_count bigint, missing_evidence_count bigint
 )
@@ -30,7 +30,7 @@ with months as (
     date_trunc('month',(p_to-1))::date,interval '1 month')::date as month
   where p_to>p_from and p_to<=p_from+interval '10 years'
 ), paid as (
-  select o.id,o.total,o.guest_count,o.business_date
+  select o.id,o.total,o.guest_count,o.business_date,o.check_group_id,o.order_channel_code
   from public.orders o
   where o.store_id=p_store_id and o.business_date>=p_from and o.business_date<p_to
     and o.payment_status='paid' and o.status <> 'cancelled'
@@ -43,6 +43,19 @@ with months as (
     sum(oi.quantity*coalesce(pr.cost_price,0))::numeric estimated_cogs
   from paid p join public.order_items oi on oi.order_id=p.id
   left join public.products pr on pr.id=oi.product_id group by 1
+), fee_groups as (
+  select date_trunc('month',business_date)::date month,
+    coalesce(order_channel_code,'dine_in') channel_code,
+    case when check_group_id is null then 'o:' || id::text else 'g:' || check_group_id::text end visit_key,
+    sum(total)::numeric group_sales
+  from paid group by 1,2,3
+), fee_rules as (
+  select distinct on (channel_code) channel_code,percent_fee,fixed_fee
+  from public.channel_fee_rules where store_id=p_store_id and active=true
+  order by channel_code,starts_on desc nulls last,id desc
+), fees as (
+  select f.month,sum(round(f.group_sales*coalesce(r.percent_fee,0)/100+coalesce(r.fixed_fee,0)))::numeric channel_fees
+  from fee_groups f join fee_rules r using(channel_code) group by 1
 ), shifts as (
   select date_trunc('month',shift_date)::date month,sum(coalesce(labor_cost,0))::numeric labor
   from public.work_shifts where store_id=p_store_id and shift_date>=p_from and shift_date<p_to group by 1
@@ -71,12 +84,12 @@ with months as (
 )
 select m.month,coalesce(r.sales,0),coalesce(r.order_count,0),coalesce(r.guest_count,0),
   coalesce(c.estimated_cogs,0),coalesce(s.labor,0),coalesce(e.expenses,0),
-  coalesce(w.waste,0),coalesce(sc.staff_consumption,0),coalesce(ec.categories,'{}'::jsonb),
+  coalesce(w.waste,0),coalesce(sc.staff_consumption,0),coalesce(f.channel_fees,0),coalesce(ec.categories,'{}'::jsonb),
   coalesce(e.expense_count,0),coalesce(e.unknown_tax_count,0),
   coalesce(e.missing_vendor_count,0),coalesce(e.missing_evidence_count,0)
 from months m left join revenue r using(month) left join cost c using(month)
 left join shifts s using(month) left join exp e using(month)
-left join waste_rows w using(month) left join staff_rows sc using(month)
+left join waste_rows w using(month) left join staff_rows sc using(month) left join fees f using(month)
 left join exp_categories ec using(month) order by m.month;
 $report$;
 -- The Edge Function checks store membership and uses the service role. No direct client RPC.
