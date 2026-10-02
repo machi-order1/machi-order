@@ -19,7 +19,7 @@ create index if not exists work_shifts_store_date_finance_idx on public.work_shi
 
 create or replace function public.management_financial_months(p_store_id bigint,p_from date,p_to date)
 returns table (
-  month date, sales numeric, order_count bigint, guest_count bigint, estimated_cogs numeric,
+  month date, sales numeric, order_count bigint, guest_count bigint, estimated_cogs numeric, uncosted_items bigint,
   labor numeric, expenses numeric, waste numeric, staff_consumption numeric, channel_fees numeric,
   expense_categories jsonb, expense_count bigint, unknown_tax_count bigint,
   missing_vendor_count bigint, missing_evidence_count bigint
@@ -40,7 +40,8 @@ with months as (
   from paid group by 1
 ), cost as (
   select date_trunc('month',p.business_date)::date month,
-    sum(oi.quantity*coalesce(pr.cost_price,0))::numeric estimated_cogs
+    sum(oi.quantity*coalesce(pr.cost_price,0))::numeric estimated_cogs,
+    count(*) filter(where pr.cost_price is null or pr.cost_price<=0)::bigint uncosted_items
   from paid p join public.order_items oi on oi.order_id=p.id
   left join public.products pr on pr.id=oi.product_id group by 1
 ), fee_groups as (
@@ -83,7 +84,7 @@ with months as (
     and event_type <> 'waste' group by 1
 )
 select m.month,coalesce(r.sales,0),coalesce(r.order_count,0),coalesce(r.guest_count,0),
-  coalesce(c.estimated_cogs,0),coalesce(s.labor,0),coalesce(e.expenses,0),
+  coalesce(c.estimated_cogs,0),coalesce(c.uncosted_items,0),coalesce(s.labor,0),coalesce(e.expenses,0),
   coalesce(w.waste,0),coalesce(sc.staff_consumption,0),coalesce(f.channel_fees,0),coalesce(ec.categories,'{}'::jsonb),
   coalesce(e.expense_count,0),coalesce(e.unknown_tax_count,0),
   coalesce(e.missing_vendor_count,0),coalesce(e.missing_evidence_count,0)
