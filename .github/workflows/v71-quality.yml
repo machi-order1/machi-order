@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 22
       - name: Check JavaScript syntax
-        run: node --check machi-app.js && node --check machi-ui-config.js && node --check sw.js
+        run: node --check machi-app.js && node --check machi-ui-config.js && node --check financial-analysis.js && node --check sw.js
       - name: Audit store routing
         run: node scripts/audit-store-routing.mjs
       - name: Check financial report calculations
