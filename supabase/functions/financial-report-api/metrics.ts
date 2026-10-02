@@ -42,3 +42,32 @@ export function yearOverYear(rows: Month[], year: number, today: string) {
   return { months, percent: latest.order_count && previous.order_count && previous.sales
     ? Math.round((latest.sales - previous.sales) / previous.sales * 1000) / 10 : null }
 }
+export type Guidance = { priority: 'high' | 'normal'; title: string; evidence: string; next: string; destination: 'sales' | 'cost' | 'labor' | 'closing' | 'expenses' | 'comparison' }
+
+export function guideBusiness(rows: Month[], year: number, today: string): Guidance[] {
+  const selected = summarize(rows.filter(row => Number(row.month.slice(0, 4)) === year))
+  const items: Guidance[] = []
+  if (!selected.order_count && !selected.expense_count && !selected.closed_days && !selected.labor) {
+    return [{ priority: 'normal', title: 'まず記録を始める', evidence: '売上・経費・日次締めの記録がまだありません。', next: '今日の売上を確認し、経費を1件ずつ記録してください。', destination: 'sales' }]
+  }
+  if (selected.uncosted_items) items.push({ priority: 'high', title: '原価の抜けを埋める', evidence: `原価未登録の商品明細が${selected.uncosted_items}件あります。`, next: '商品原価を登録してから利益を見直してください。', destination: 'cost' })
+  if (selected.unknown_tax_count || selected.missing_evidence_count) items.push({ priority: 'high', title: '経費の根拠をそろえる', evidence: `税区分未確認${selected.unknown_tax_count}件、証憑未連携${selected.missing_evidence_count}件。`, next: '領収書原本と経費の内容・税区分を照合してください。', destination: 'expenses' })
+  const comparable = yearOverYear(rows, year, today)
+  if (comparable.percent !== null && comparable.percent < -5) {
+    const current = summarize(rows.filter(row => Number(row.month.slice(0, 4)) === year && Number(row.month.slice(5, 7)) <= comparable.months))
+    const previous = summarize(rows.filter(row => Number(row.month.slice(0, 4)) === year - 1 && Number(row.month.slice(5, 7)) <= comparable.months))
+    const visitChange = previous.visit_count ? Math.round((current.visit_count / previous.visit_count - 1) * 1000) / 10 : null
+    const ticketCurrent = current.visit_count ? current.sales / current.visit_count : 0
+    const ticketPrevious = previous.visit_count ? previous.sales / previous.visit_count : 0
+    const ticketChange = ticketPrevious ? Math.round((ticketCurrent / ticketPrevious - 1) * 1000) / 10 : null
+    const driver = visitChange !== null && (ticketChange === null || visitChange < ticketChange) ? '来店組数' : '1組あたり売上'
+    items.push({ priority: 'normal', title: '売上が落ちた月を調べる', evidence: `完了月の売上は前年同期間比${comparable.percent}%。${driver}の変化が大きい傾向です。`, next: '同じ月の比較を開き、落ち込みが始まった月を確認してください。', destination: 'comparison' })
+  }
+  if (selected.sales > 0 && selected.estimated_profit < 0) {
+    const largest = selected.labor >= selected.expenses ? '人件費とシフト' : '費目別の経費'
+    items.push({ priority: 'normal', title: '赤字の内訳を確認する', evidence: `参考利益は¥${Math.round(selected.estimated_profit).toLocaleString('ja-JP')}です。`, next: `${largest}から金額と入力漏れを確かめてください。`, destination: selected.labor >= selected.expenses ? 'labor' : 'expenses' })
+  }
+  if (selected.order_count && !selected.closed_days) items.push({ priority: 'normal', title: '日次締めを残す', evidence: '売上はありますが、締め済み営業日の記録がありません。', next: '日次締めと現金差額を確認してください。', destination: 'closing' })
+  if (!items.length) items.push({ priority: 'normal', title: '同じ月の推移を確認する', evidence: '現在の登録データで大きな欠落は検出されていません。', next: '前年の同月と組数・単価を比べてください。', destination: 'comparison' })
+  return items.slice(0, 3)
+}
