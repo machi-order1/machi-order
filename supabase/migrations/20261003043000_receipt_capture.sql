@@ -128,3 +128,25 @@ begin
 end $close$;
 revoke all on function public.close_expense_month(bigint,date,uuid) from public,anon,authenticated;
 grant execute on function public.close_expense_month(bigint,date,uuid) to service_role;
+
+-- Aggregate without the API's default 1000-row response limit.
+create or replace function public.expense_month_overview(p_store_id bigint,p_month date)
+returns table(pending bigint,confirmed bigint,unknown_tax bigint,expense_total numeric)
+language sql stable security invoker set search_path='public','pg_temp' as $overview$
+select
+  (select count(*) from public.receipt_imports r where r.store_id=p_store_id
+    and r.created_at>=(p_month::timestamp at time zone 'Asia/Tokyo')
+    and r.created_at<((p_month+interval '1 month')::timestamp at time zone 'Asia/Tokyo')
+    and r.extraction_status in ('needs_review','pending','failed')),
+  (select count(*) from public.receipt_imports r where r.store_id=p_store_id
+    and r.confirmed=true and r.purchased_at>=(p_month::timestamp at time zone 'Asia/Tokyo')
+    and r.purchased_at<((p_month+interval '1 month')::timestamp at time zone 'Asia/Tokyo')),
+  (select count(*) from public.store_expenses e where e.store_id=p_store_id
+    and e.expense_date>=p_month and e.expense_date<(p_month+interval '1 month')::date
+    and e.voided_at is null and e.tax_category='unknown'),
+  (select coalesce(sum(e.amount),0) from public.store_expenses e where e.store_id=p_store_id
+    and e.expense_date>=p_month and e.expense_date<(p_month+interval '1 month')::date
+    and e.voided_at is null);
+$overview$;
+revoke all on function public.expense_month_overview(bigint,date) from public,anon,authenticated;
+grant execute on function public.expense_month_overview(bigint,date) to service_role;
