@@ -43,9 +43,12 @@ Deno.serve(async request => {
         || Number.isNaN(Date.parse(`${requestedDate}T00:00:00Z`))
         || new Date(`${requestedDate}T00:00:00Z`).toISOString().slice(0, 10) !== requestedDate) return json({ error: '期間・商品を確認してください' }, 400)
       const { from, to } = menuDateRange(localToday, range, requestedDate)
-      const { data, error } = await sb.rpc('management_menu_sales', { p_store_id: storeId, p_from: from, p_to: to, p_product_id: idText ? Number(idText) : null })
-      if (error) throw error
-      return json({ store_id: storeId, range, from, to_exclusive: to, ...data, basis: 'item_line_before_order_discount' })
+      const [menuResult, alcoholResult] = await Promise.all([
+        sb.rpc('management_menu_sales', { p_store_id: storeId, p_from: from, p_to: to, p_product_id: idText ? Number(idText) : null }),
+        sb.rpc('management_alcohol_sales', { p_store_id: storeId, p_from: from, p_to: to }),
+      ])
+      if (menuResult.error || alcoholResult.error) throw menuResult.error || alcoholResult.error
+      return json({ store_id: storeId, range, from, to_exclusive: to, ...menuResult.data, alcohol: alcoholResult.data || [], basis: 'item_line_before_order_discount' })
     }
     if (request.method === 'POST') {
       if (!['owner', 'admin', 'manager'].includes(member.role)) return json({ error: '経費を記録する権限がありません' }, 403)
