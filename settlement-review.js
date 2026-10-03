@@ -9,11 +9,11 @@
   const base = 'https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/'
   const yen = n => '¥'+Number(n||0).toLocaleString('ja-JP')
   const node = (tag,value) => { const el=document.createElement(tag); el.textContent=value; return el }
-  let entries = [], prepared = [], manualKey = null
+  let entries = [], prepared = [], manualKey = null, loadSerial = 0
   function clearCsv() { prepared=[]; $('csv-import').disabled=true; $('csv-file').value=''; $('csv-preview').replaceChildren(); $('csv-status').textContent='店舗・月が変わったため、CSVを選び直してください。' }
-  function endpoint(name) { return base+name+'?'+new URLSearchParams({ store_id:$('store').value,month:$('month').value }) }
-  async function api(name, method='GET', body) {
-    const response = await fetch(endpoint(name),{ method,headers:{ Authorization:'Bearer '+token(),...(body?{'Content-Type':'application/json'}:{}) },body:body?JSON.stringify(body):undefined })
+  function endpoint(name,store=$('store').value,month=$('month').value) { return base+name+'?'+new URLSearchParams({ store_id:store,month }) }
+  async function api(name, method='GET', body, store=$('store').value, month=$('month').value) {
+    const response = await fetch(endpoint(name,store,month),{ method,headers:{ Authorization:'Bearer '+token(),...(body?{'Content-Type':'application/json'}:{}) },body:body?JSON.stringify(body):undefined })
     const data = await response.json().catch(()=>({}))
     if (response.status===401) { location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search)); throw Error('ログインし直してください') }
     if (!response.ok) { const error=Error(data.error||'処理できませんでした'); error.kind=data.kind; throw error }
@@ -40,22 +40,39 @@
       return tr
     })
   }
+  function renderWindow(rows) {
+    table('window',['対象月','PayPay POS売上','締め済み日','PayPay入金記録','状態'],rows,row=>cells(row.available
+      ? [row.month,yen(row.sales),`${row.closed_days}日`,`${yen(row.deposits)}（${row.deposit_count}件）`,'月ごとの参考値']
+      : [row.month,'取得できません','—','取得できません','要再確認']))
+  }
   async function load() {
     if(!token()) { location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search)); return }
-    $('download').disabled=true; entries=[]
+    const current=++loadSerial,store=$('store').value,month=$('month').value
+    if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)){$('status').textContent='月を確認してください';return}
+    $('download').disabled=true; entries=[];$('window').textContent='読み込み中…'
     $('status').className='muted'; $('status').textContent='読み込み中…'; $('refresh').disabled=true
     try {
-      const data=await api('settlement-api'); entries=data.entries||[]; render()
-      const source=await api('accounting-sources-api').catch(()=>null)
+      const [data,sourceResult]=await Promise.all([api('settlement-api','GET',undefined,store,month),api('accounting-sources-api','GET',undefined,store,month).then(value=>({value})).catch(()=>({value:null}))])
+      if(current!==loadSerial)return
+      entries=data.entries||[]; render()
+      const source=sourceResult.value
       if(source) {
         const cash=source.cash_rows||[], paypay=cash.reduce((sum,row)=>sum+Number(row.paypay_sales||0),0), paypayDeposits=entries.filter(row=>!row.voided_at&&row.channel_code==='paypay').reduce((sum,row)=>sum+Number(row.amount_yen),0)
         $('comparison').textContent=`締め済みの日のPayPay POS売上 ${yen(paypay)} ／ この月に記録したPayPay入金 ${yen(paypayDeposits)}。売上日と着金日が異なるため、差額の確定判定はしていません。銀行明細との照合は未完了です。`
       } else $('comparison').textContent='POS売上を取得できませんでした。入金記録は表示していますが、比較は未完了です。'
-      $('back').href='/journal-sources.html?store_id='+$('store').value+'&month='+$('month').value
-      const page=new URL(location.href);page.searchParams.set('store_id',$('store').value);page.searchParams.set('month',$('month').value);history.replaceState(null,'',page)
+      const months=[window.MACHI_SETTLEMENT_WINDOW.shift(month,-1),month,window.MACHI_SETTLEMENT_WINDOW.shift(month,1)]
+      const nearby=await Promise.all(months.map(async m=>{
+        if(m===month)return window.MACHI_SETTLEMENT_WINDOW.summarize(m,source,data)
+        const [sales,statement]=await Promise.allSettled([api('accounting-sources-api','GET',undefined,store,m),api('settlement-api','GET',undefined,store,m)])
+        return window.MACHI_SETTLEMENT_WINDOW.summarize(m,sales.status==='fulfilled'?sales.value:null,statement.status==='fulfilled'?statement.value:null)
+      }))
+      if(current!==loadSerial)return
+      renderWindow(nearby)
+      $('back').href='/journal-sources.html?store_id='+store+'&month='+month
+      const page=new URL(location.href);page.searchParams.set('store_id',store);page.searchParams.set('month',month);history.replaceState(null,'',page)
       $('status').textContent='更新 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
-    } catch(error) { $('status').className='muted error';$('status').textContent=error.message;$('entries').textContent='取得できませんでした';$('comparison').textContent='取得できませんでした';entries=[];$('download').disabled=true }
-    finally { $('refresh').disabled=false }
+    } catch(error) { if(current===loadSerial){$('status').className='muted error';$('status').textContent=error.message;$('entries').textContent='取得できませんでした';$('comparison').textContent='取得できませんでした';$('window').textContent='取得できませんでした';entries=[];$('download').disabled=true} }
+    finally { if(current===loadSerial)$('refresh').disabled=false }
   }
   async function voidEntry(id) {
     const reason=prompt('取消理由を5文字以上で入力してください')
