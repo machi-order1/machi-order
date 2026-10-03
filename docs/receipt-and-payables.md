@@ -8,6 +8,12 @@
 - 経費の月次締めは月末後、未確認写真と税区分未設定がなくなったときに行う。締めた月の経費変更は禁止し、監査記録と税込合計を保持する。訂正は店長が理由を残して開き直し、再度締める。以前の締めの合計は履歴に保持する。売上、給与、棚卸を含む決算の締めではない。
 - 業者請求書は下書き → 確定・未払い → 一部または全額支払い。振込結果を確認した後、支払日、金額、方法、照会番号を手動で追記し、残高と期限超過を見られる。支払い記録は冪等キーで二重登録を防ぐ。請求日基準の請求額、前月比、売上比、取引先上位、増加要因の確認案を参考表示する。請求書を撮影しただけでは経費や現金支出へ計上しない。
 
+## 配置状況（2026-10-03）
+
+- 4本の関連マイグレーションを本番DBに適用し、`financial-report-api`、`receipt-api`、`invoice-api` を認証必須で配置した。非公開バケットの作成と月次集計を読み取りで確認した。
+- DB上のロールバック付き取引で、領収書の確定・重複防止、月次締め・理由付き再開、請求書の一部払いと完済を検証した。テストデータは残していない。
+- GitHubの `main` に画面を統合したが、既存NetlifyサイトはFreeチームのクレジット使用枠超過で新しいデプロイが拒否されている。公開URLは旧画面のまま。復旧後に画面を配信し、実機撮影・スタッフ権限・OCR・写真の閲覧を検証する。
+
 ## 導入順と前提
 
 1. `20261003033000_financial_reporting_foundation.sql`、`20261003043000_receipt_capture.sql`、`20261003053000_supplier_invoices.sql` の順に適用する。
@@ -17,4 +23,4 @@
 
 ## 検証
 
-`node --experimental-strip-types scripts/test-receipt-parser.mjs`、`node --experimental-strip-types scripts/test-invoice-parser.mjs`、`node scripts/test-financial-report.mjs`。実データを伴う DB マイグレーション、スマホ撮影、OCR 精度、Edge Functions と Storage の結合検証は別途必要。
+`node --experimental-strip-types scripts/test-receipt-parser.mjs`、`node --experimental-strip-types scripts/test-invoice-parser.mjs`、`node scripts/test-financial-report.mjs`。スマホ撮影、実際の領収書によるOCR精度、認証付きEdge FunctionsとStorageの結合検証は公開画面の配信後に必要。
