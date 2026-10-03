@@ -90,12 +90,8 @@ Deno.serve(async request => {
     if (request.method === 'POST' && mode === 'resolve') {
       const body = await request.json(), id = Number(body.id), reason = String(body.reason || ''), note = String(body.note || '').trim()
       if (!Number.isSafeInteger(id) || !['inventory','personal','duplicate','other'].includes(reason) || note.length < 3 || note.length > 500) return reply({ error: '処理理由とメモを入力してください' }, 400)
-      const { data: receipt, error: lookupError } = await db.from('receipt_imports').select('id,extraction_status').eq('store_id', storeId).eq('id', id).single()
-      if (lookupError || !receipt) return reply({ error: '写真が見つかりません' }, 404)
-      if (!pendingStatuses.includes(receipt.extraction_status)) return reply({ error: '処理済みです' }, 409)
-      const { error } = await db.from('receipt_imports').update({ extraction_status: `resolved_${reason}`, review_note: note, confirmed_by: user.id, confirmed_at: new Date().toISOString() }).eq('id', id).eq('store_id', storeId).in('extraction_status', pendingStatuses)
-      if (error) throw error
-      await db.from('audit_logs').insert({ store_id: storeId, user_id: user.id, action: 'receipt_resolved', entity_type: 'receipt_import', entity_id: String(id), details: { reason, note } })
+      const { error } = await db.rpc('resolve_receipt_import', { p_store_id: storeId, p_receipt_id: id, p_user_id: user.id, p_reason: reason, p_note: note })
+      if (error) { if (errorMessage(error).includes('receipt_already_resolved')) return reply({ error: 'この写真は既に処理済みです' }, 409); throw error }
       return reply({ resolved: true })
     }
     if (request.method === 'GET' && mode === 'month') {
@@ -103,7 +99,7 @@ Deno.serve(async request => {
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return reply({ error: '月を確認してください' }, 400)
       const [overview, closing] = await Promise.all([
         db.rpc('expense_month_overview', { p_store_id: storeId, p_month: start }).single(),
-        db.from('expense_month_closings').select('id,closed_at,expense_total,expense_count,receipt_count').eq('store_id',storeId).eq('month',start).maybeSingle()
+        db.from('expense_month_closings').select('id,closed_at,expense_total,expense_count,receipt_count').eq('store_id',storeId).eq('month',start).is('reopened_at',null).maybeSingle()
       ])
       if (overview.error || closing.error) throw overview.error || closing.error
       return reply({ month, ...overview.data, closing: closing.data })
@@ -114,6 +110,13 @@ Deno.serve(async request => {
       const { data, error } = await db.rpc('close_expense_month', { p_store_id: storeId, p_month: `${month}-01`, p_user_id: user.id })
       if (error) { const msg = errorMessage(error); if (['pending_receipts','unknown_tax_category','month_not_finished'].some(x => msg.includes(x))) return reply({ error: msg.includes('pending') ? '未確認の写真があります' : msg.includes('unknown') ? '税区分が未設定の経費があります' : '月末を過ぎてから締めてください' }, 409); throw error }
       return reply({ id: data, closed: true })
+    }
+    if (request.method === 'POST' && mode === 'reopen') {
+      const body = await request.json(), month = String(body.month || ''), reason = String(body.reason || '').trim()
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || reason.length < 5 || reason.length > 500) return reply({ error: '対象月と理由を確認してください' }, 400)
+      const { data, error } = await db.rpc('reopen_expense_month', { p_store_id: storeId, p_month: `${month}-01`, p_user_id: user.id, p_reason: reason })
+      if (error) { if (errorMessage(error).includes('month_not_closed')) return reply({ error: 'この月は締められていません' }, 409); throw error }
+      return reply({ id: data, reopened: true })
     }
     return reply({ error: '操作が見つかりません' }, 404)
   } catch (error) { console.error(error); return reply({ error: '処理に失敗しました。もう一度お試しください' }, 500) }
