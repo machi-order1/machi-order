@@ -46,7 +46,7 @@ Deno.serve(async request => {
     }
     const year = Number(query.get('year') || localToday.slice(0, 4)), span = Number(query.get('span') || 1)
     if (!Number.isInteger(year) || year < 2000 || year > 2100 || ![1, 5, 10].includes(span)) return json({ error: '年と期間を確認してください' }, 400)
-    const startYear = year - (span === 1 ? 1 : span - 1), start = `${startYear}-01-01`, end = `${year + 1}-01-01`
+    const startYear = Math.min(year - span + 1, year - 2), start = `${startYear}-01-01`, end = `${year + 1}-01-01`
     if (query.get('mode') === 'export') {
       const exportStart = `${year}-01-01`
       if (span !== 1 || !['owner', 'admin', 'manager'].includes(member.role)) return json({ error: '明細出力の権限・期間を確認してください' }, 403)
