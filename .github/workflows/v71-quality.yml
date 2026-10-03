@@ -22,10 +22,12 @@ jobs:
         with:
           node-version: 22
       - name: Check JavaScript syntax
-        run: node --check machi-app.js && node --check machi-ui-config.js && node --check financial-analysis.js && node --check sw.js
+        run: node --check machi-app.js && node --check machi-ui-config.js && node --check financial-analysis.js && node --check receipt-capture.js && node --check invoice-management.js && node --check sw.js
       - name: Audit store routing
         run: node scripts/audit-store-routing.mjs
       - name: Check financial report calculations
         run: node --experimental-strip-types scripts/test-financial-report.mjs
+      - name: Check receipt and invoice OCR suggestions
+        run: node --experimental-strip-types scripts/test-receipt-parser.mjs && node --experimental-strip-types scripts/test-invoice-parser.mjs
       - name: Run V71 regression checks
         run: node scripts/qa-v71.mjs
