@@ -4,5 +4,5 @@
 <section class="card notice"><h2>現在の状態：準備中</h2><p>売上や参考利益を記録していますが、申告者・開始残高、現金と銀行の照合、棚卸、複式仕訳の実取引への適用がまだ必要です。画面上の利益を申告所得として使わないでください。</p></section>
 <section class="card"><div class="controls"><label>店舗<select id="store"><option value="1">151 長浜店</option><option value="2">151 白木原店</option></select></label><label>対象年<input id="year" type="number" min="2000" max="2100"></label><button id="refresh" type="button">確認</button></div><p id="status" class="muted" role="status" aria-live="polite"></p></section>
 <section class="card"><h2 id="summary-heading">数字の記録</h2><div id="summary" class="muted">読み込み中…</div><p class="muted">税込の管理用概算です。店舗別の数字であり、申告者全体の確定値ではありません。</p></section>
-<section class="card"><h2>確認する項目</h2><div id="checks" role="status" aria-live="polite">読み込み中…</div></section>
+<section class="card"><h2>確認する項目</h2><p><a id="source-link" href="/journal-sources.html">日次締め・経費の元データを確認する →</a></p><div id="checks" role="status" aria-live="polite">読み込み中…</div></section>
 </main><script src="/filing-readiness-rules.js"></script><script src="/filing-readiness.js" defer></script></body></html>
