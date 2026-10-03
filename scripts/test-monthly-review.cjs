@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict')
+const {checks}=require('../monthly-review-rules.js')
+const base={sales_rows:[{date:'2026-10-01'}],cash_rows:[{cash_actual:null,cash_difference:null,paypay_sales:3000}],expense_rows:[{tax_category:'unknown',has_receipt:false,vendor:'',changed_after_link:true}]}
+const result=checks(base,{entries:[{channel_code:'paypay',voided_at:'2026-10-02'}]},{overdue_count:2,duplicate_count:1},{overdue:1,drafts:0})
+assert.equal(result.summary.closed_days,1)
+for(const label of ['現金実在高の未入力','税区分が未確認の経費','証憑が未連携の経費','仕訳紐付け後に変わった元データ','PayPay入金の参考確認','前日以前の未確認レシート','期限超過の請求書'])assert(result.problems.some(x=>x.label===label),label)
+assert(result.problems.find(x=>x.label==='PayPay入金の参考確認').level==='review')
+const clear=checks({sales_rows:[{}],cash_rows:[{cash_actual:0,cash_difference:0,paypay_sales:0}],expense_rows:[]},{entries:[]},{overdue_count:0,duplicate_count:0},{overdue:0,drafts:0})
+assert.equal(clear.problems.length,0)
+const missing=checks({sales_rows:[],cash_rows:[],expense_rows:[]},{entries:[]},null,null)
+assert(missing.problems.some(x=>x.level==='unknown'))
+console.log('PASS monthly review priority and unknown classifications')
