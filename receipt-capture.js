@@ -85,8 +85,9 @@
   $('resolve').onclick=async()=>{if(!selected)return; const note=$('reason-note').value.trim(); if(note.length<3) return msg('処理理由を3文字以上で記入してください','error'); $('resolve').disabled=true
     try {await api('resolve','POST',{id:selected.id,reason:$('reason').value,note}); msg('理由を残して処理しました。'); selected=null; $('review').classList.add('hidden'); await load()} catch(e){msg(e.message,'error')}finally{$('resolve').disabled=false}
   }
-  async function loadMonth(){const d=await api('month','GET',null,{month:$('month').value}); $('month-summary').textContent=`登録経費 ¥${Number(d.expense_total).toLocaleString()} ／ 写真確定 ${d.confirmed}件 ／ 未確認 ${d.pending}件 ／ 税区分未設定 ${d.unknown_tax}件${d.closing?' ／ 締め済み':''}`; $('close').disabled=!!d.closing || !!d.pending || !!d.unknown_tax}
+  async function loadMonth(){const d=await api('month','GET',null,{month:$('month').value}); $('month-summary').textContent=`登録経費 ¥${Number(d.expense_total).toLocaleString()} ／ 写真確定 ${d.confirmed}件 ／ 未確認 ${d.pending}件 ／ 税区分未設定 ${d.unknown_tax}件${d.closing?' ／ 締め済み':''}`; $('close').disabled=!!d.closing || !!d.pending || !!d.unknown_tax; $('reopen-box').classList.toggle('hidden',!d.closing)}
   $('month').onchange=()=>loadMonth().catch(e=>msg(e.message,'error'))
   $('close').onclick=async()=>{ $('close').disabled=true; try{await api('close','POST',{month:$('month').value});msg($('month').value+'の経費を締めました。');await loadMonth()}catch(e){msg(e.message,'error');await loadMonth()}}
+  $('reopen').onclick=async()=>{const reason=$('reopen-reason').value.trim();if(reason.length<5)return msg('締め直す理由を5文字以上で記入してください','error');$('reopen').disabled=true;try{await api('reopen','POST',{month:$('month').value,reason});msg($('month').value+'の締めを開きました。修正後に再度締めてください。');$('reopen-reason').value='';await loadMonth()}catch(e){msg(e.message,'error')}finally{$('reopen').disabled=false}}
   load()
 })()
