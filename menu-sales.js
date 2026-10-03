@@ -32,11 +32,21 @@
     const buckets = new Map()
     for (const row of rows) {
       const key = annual ? row.date.slice(0, 7) : data.range === 'today' || data.range === 'date' ? slots.find(([slot]) => slot === row.slot)?.[1] || 'その他' : row.date
-      const current = buckets.get(key) || { quantity: 0, amount: 0 }
-      current.quantity += Number(row.quantity || 0); current.amount += Number(row.amount || 0); buckets.set(key, current)
+      const current = buckets.get(key) || { quantity: 0, amount: 0, lunch: { quantity: 0, amount: 0 }, dinner: { quantity: 0, amount: 0 }, other: { quantity: 0, amount: 0 } }
+      const quantity = Number(row.quantity || 0), amount = Number(row.amount || 0)
+      current.quantity += quantity; current.amount += amount
+      current[row.slot].quantity += quantity; current[row.slot].amount += amount
+      buckets.set(key, current)
     }
-    const detailRows = [...buckets].sort(([a],[b]) => a.localeCompare(b)).map(([key, value]) => [key, `${value.quantity.toLocaleString('ja-JP')}杯・点`, yen(value.amount)])
-    table($('details'), [annual ? '月' : data.range === 'today' || data.range === 'date' ? '時間帯' : '日付','販売数','明細金額'], detailRows.length ? detailRows : [['記録なし','—','—']])
+    const isDay = data.range === 'today' || data.range === 'date'
+    const detailRows = [...buckets].sort(([a],[b]) => a.localeCompare(b)).map(([key, value]) => isDay
+      ? [key, `${value.quantity.toLocaleString('ja-JP')}杯・点`, yen(value.amount)]
+      : [key, `${value.lunch.quantity} / ${yen(value.lunch.amount)}`, `${value.dinner.quantity} / ${yen(value.dinner.amount)}`, `${value.other.quantity} / ${yen(value.other.amount)}`, `${value.quantity} / ${yen(value.amount)}`])
+    table($('details'), isDay ? ['時間帯','販売数','明細金額'] : [annual ? '月' : '日付','昼 杯・点 / 金額','夜 杯・点 / 金額','その他 杯・点 / 金額','合計 杯・点 / 金額'], detailRows.length ? detailRows : [isDay ? ['記録なし','—','—'] : ['記録なし','—','—','—','—']])
+    const alcohol = data.alcohol || []
+    table($('alcohol'), ['アルコール','ハッピーアワーの杯数','それ以外の杯数','未判定'], alcohol.length
+      ? alcohol.map(item => [item.name, `${Number(item.happy_quantity || 0)}杯`, `${Number(item.other_quantity || 0)}杯`, `${Number(item.unknown_quantity || 0)}杯`])
+      : [['該当する商品なし','—','—','—']])
   }
   async function load() {
     const token = access()
