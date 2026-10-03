@@ -51,6 +51,7 @@
     try {
       const data=await api('list'); $('pending').textContent=data.pending_count+(data.limited ? '+' : ''); $('overdue').textContent=data.overdue_count+(data.limited ? '+' : ''); $('duplicates').textContent=data.duplicate_count+(data.limited ? '+' : '')
       $('review').classList.toggle('hidden', !data.manager); $('month-card').classList.toggle('hidden', !data.manager)
+      $('storage-card').classList.toggle('hidden', !data.manager)
       if (data.manager && !selected) $('review').classList.add('hidden')
       $('items').replaceChildren()
       if (!data.items.length) $('items').append(el('p','登録済みの写真はありません。','muted'))
@@ -60,7 +61,7 @@
         const label=`${late?'翌日以降の未確認 · ':''}${dateText(row.created_at)} · ${row.vendor_name || '取引先未読取'} · ${row.total_amount ? '¥'+Number(row.total_amount).toLocaleString():'金額未読取'} · ${row.extracted_data?.duplicate_candidates?.length?'重複候補 · ':''}${pending?'確認待ち':row.confirmed?'経費確定':'処理済み'}`
         const button=el('button',label,'item'+(late?' overdue':'')); button.onclick=()=>review(row,data.manager); $('items').append(button)
       }
-      if (data.manager) await loadMonth()
+      if (data.manager) await Promise.all([loadMonth(), loadStorage()])
     } catch(e) { msg(e.message,'error') }
   }
   async function review(row,manager) {
@@ -86,6 +87,14 @@
     try {await api('resolve','POST',{id:selected.id,reason:$('reason').value,note}); msg('理由を残して処理しました。'); selected=null; $('review').classList.add('hidden'); await load()} catch(e){msg(e.message,'error')}finally{$('resolve').disabled=false}
   }
   async function loadMonth(){const d=await api('month','GET',null,{month:$('month').value}); $('month-summary').textContent=`登録経費 ¥${Number(d.expense_total).toLocaleString()} ／ 写真確定 ${d.confirmed}件 ／ 未確認 ${d.pending}件 ／ 税区分未設定 ${d.unknown_tax}件${d.closing?' ／ 締め済み':''}`; $('close').disabled=!!d.closing || !!d.pending || !!d.unknown_tax; $('reopen-box').classList.toggle('hidden',!d.closing)}
+  async function loadStorage(){
+    try {
+      const d=await api('storage'), used=Number(d.project_bytes||0), total=Number(d.reference_bytes||1073741824), percent=Math.round(used/total*1000)/10
+      const label=`全店舗 ${Number(d.project_files||0).toLocaleString()}枚・${(used/1048576).toFixed(1)}MB ／ 1GBの目安 ${percent}%（この店舗 ${(Number(d.store_bytes||0)/1048576).toFixed(1)}MB）`
+      $('storage-summary').textContent=(percent>=80?'容量が8割を超えました。保管計画を確認してください。':percent>=60?'容量が6割を超えました。増加ペースを確認してください。':'')+label
+      $('storage-summary').className=percent>=80?'alert':percent>=60?'alert':''
+    } catch { $('storage-summary').textContent='容量を取得できませんでした。管理画面で保存容量を確認してください。' }
+  }
   $('month').onchange=()=>loadMonth().catch(e=>msg(e.message,'error'))
   $('close').onclick=async()=>{ $('close').disabled=true; try{await api('close','POST',{month:$('month').value});msg($('month').value+'の経費を締めました。');await loadMonth()}catch(e){msg(e.message,'error');await loadMonth()}}
   $('reopen').onclick=async()=>{const reason=$('reopen-reason').value.trim();if(reason.length<5)return msg('締め直す理由を5文字以上で記入してください','error');$('reopen').disabled=true;try{await api('reopen','POST',{month:$('month').value,reason});msg($('month').value+'の締めを開きました。修正後に再度締めてください。');$('reopen-reason').value='';await loadMonth()}catch(e){msg(e.message,'error')}finally{$('reopen').disabled=false}}
