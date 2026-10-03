@@ -31,7 +31,7 @@ Deno.serve(async request => {
       throw Error('too_many_sources')
     }
     const [closings, expenses] = await Promise.all([
-      all(() => db.from('daily_closings').select('id,business_date,net_sales,order_count,closed_at').eq('store_id',storeId).gte('business_date',start).lt('business_date',end).order('id')),
+      all(() => db.from('daily_closings').select('id,business_date,net_sales,order_count,closed_at,cash_sales,paypay_sales,other_sales,cash_expected,cash_actual,cash_difference').eq('store_id',storeId).gte('business_date',start).lt('business_date',end).order('id')),
       all(() => db.from('store_expenses').select('id,expense_date,amount,category,name,vendor_name,tax_category,receipt_import_id').eq('store_id',storeId).gte('expense_date',start).lt('expense_date',end).is('voided_at',null).order('id')),
     ])
     const requests: Promise<any>[] = []
@@ -49,6 +49,7 @@ Deno.serve(async request => {
     const expenseRows = expenses.map(row => ({ kind:'store_expense', id:row.id, date:row.expense_date, amount:Number(row.amount), detail:row.name, category:row.category, vendor:row.vendor_name, tax_category:row.tax_category, has_receipt:!!row.receipt_import_id,
       linked_entry_id:linked.get(`store_expense:${row.id}`)?.entry_id || null,
       changed_after_link:linked.has(`store_expense:${row.id}`) && (Number(linked.get(`store_expense:${row.id}`).source_amount_yen)!==Number(row.amount) || linked.get(`store_expense:${row.id}`).source_date!==row.expense_date) }))
-    return reply({ store_id:storeId, month, sales_rows:salesRows, expense_rows:expenseRows, can_post:false, basis:'draft_source_review_only_no_automatic_journal' })
+    const cashRows = closings.map(row => ({ date:row.business_date, cash_sales:Number(row.cash_sales), paypay_sales:Number(row.paypay_sales), other_sales:Number(row.other_sales), cash_expected:Number(row.cash_expected), cash_actual:row.cash_actual === null ? null : Number(row.cash_actual), cash_difference:row.cash_difference === null ? null : Number(row.cash_difference) }))
+    return reply({ store_id:storeId, month, sales_rows:salesRows, expense_rows:expenseRows, cash_rows:cashRows, bank_reconciled:false, can_post:false, basis:'draft_source_review_only_no_automatic_journal' })
   } catch (error) { console.error(error); return reply({ error:'元データを正確に取得できませんでした' }, 500) }
 })
