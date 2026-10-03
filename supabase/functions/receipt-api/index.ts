@@ -80,6 +80,11 @@ Deno.serve(async request => {
       return reply({ role: member.role, manager, items, pending_count: pendingCount.count || 0, overdue_count: overdueCount.count || 0, duplicate_count: (pendingRows.data || []).filter((x: any) => x.extracted_data?.duplicate_candidates?.length).length, limited: (pendingRows.data || []).length === 100 || (recentRows.data || []).length === 50 })
     }
     if (!manager) return reply({ error: '店長権限が必要です' }, 403)
+    if (request.method === 'GET' && mode === 'storage') {
+      const { data, error } = await db.rpc('evidence_storage_usage', { p_store_id: storeId })
+      if (error) throw error
+      return reply({ ...data, reference_bytes: 1073741824, measured_at: new Date().toISOString() })
+    }
     if (request.method === 'POST' && mode === 'confirm') {
       const body = await request.json(), id = Number(body.id), amount = Number(body.amount), date = String(body.date || ''), vendor = String(body.vendor || '').trim(), name = String(body.name || '').trim(), category = String(body.category || ''), tax = String(body.tax_category || '')
       if (!Number.isSafeInteger(id) || !dateValid(date) || !Number.isSafeInteger(amount) || amount <= 0 || amount > 100000000 || !vendor || vendor.length > 200 || !name || name.length > 200 || !['家賃','水道光熱費','消耗品費','広告宣伝費','支払手数料','通信費','修繕費','その他'].includes(category) || !['taxable_10','taxable_8','non_taxable','exempt','out_of_scope'].includes(tax)) return reply({ error: '日付・金額・取引先・費目・税区分を確認してください' }, 400)
