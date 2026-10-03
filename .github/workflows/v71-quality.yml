@@ -33,6 +33,8 @@ jobs:
         run: node scripts/test-external-channel-csv.cjs
       - name: Check daily review classification
         run: node scripts/test-daily-check.cjs
+      - name: Check filing readiness classification
+        run: node scripts/test-filing-readiness.cjs && node --check filing-readiness.js
       - name: Check receipt and invoice OCR suggestions
         run: node --experimental-strip-types scripts/test-receipt-parser.mjs && node --experimental-strip-types scripts/test-invoice-parser.mjs
       - name: Run V71 regression checks
