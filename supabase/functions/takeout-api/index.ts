@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const allowedOrigins = new Set([
   "https://machi-order.pages.dev",
+  "https://machi-order.netlify.app",
   "https://hakata-aburasoba-151.katsuhiro-yokota.chatgpt.site"
 ]);
 
