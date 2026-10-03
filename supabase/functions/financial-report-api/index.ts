@@ -34,6 +34,13 @@ Deno.serve(async request => {
     const { data: member, error: memberError } = await sb.from('store_memberships').select('role').eq('user_id', user.id).eq('store_id', storeId).eq('active', true).maybeSingle()
     if (memberError) throw memberError
     if (!member || !['owner', 'admin', 'manager', 'viewer'].includes(member.role)) return json({ error: '閲覧権限がありません' }, 403)
+    if (request.method === 'GET' && query.get('mode') === 'external') {
+      const month = query.get('month') || localToday.slice(0, 7)
+      if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)) return json({ error: '月を確認してください' }, 400)
+      const { data, error } = await sb.rpc('external_channel_month', { p_store_id: storeId, p_month: `${month}-01` })
+      if (error) throw error
+      return json({ store_id: storeId, month, can_edit: ['owner','admin','manager'].includes(member.role), rows: data || [], basis: 'separate_platform_report_not_included_in_pos_sales' })
+    }
     if (request.method === 'GET' && query.get('mode') === 'menu') {
       const range = query.get('range') || 'today', requestedDate = query.get('date') || localToday
       const idText = query.get('product_id') || ''
@@ -53,6 +60,20 @@ Deno.serve(async request => {
     if (request.method === 'POST') {
       if (!['owner', 'admin', 'manager'].includes(member.role)) return json({ error: '経費を記録する権限がありません' }, 403)
       const body = await request.json().catch(() => ({}))
+      if (body.action === 'external_channel_day') {
+        const date = String(body.business_date || ''), channel = String(body.channel_code || ''), key = String(body.entry_key || '')
+        const gross = Number(body.gross_sales), orders = Number(body.order_count), fee = Number(body.platform_fee), payout = Number(body.payout_amount), version = Number(body.expected_version)
+        const reference = String(body.source_ref || '').trim(), note = String(body.note || '').trim()
+        if (!/^20\d{2}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date || date > localToday
+          || !['uber_eats','rocket_now'].includes(channel) || ![gross,fee,payout].every(value => Number.isSafeInteger(value) && value >= 0 && value <= 1000000000)
+          || !Number.isInteger(orders) || orders < 0 || orders > 100000 || !Number.isInteger(version) || version < 0
+          || reference.length > 120 || note.length > 500 || !/^[0-9a-f-]{36}$/i.test(key)) return json({ error: '外部サービスの実績を確認してください' }, 400)
+        const { data: saved, error } = await sb.rpc('save_external_channel_day', { p_store_id: storeId, p_user_id: user.id, p_channel: channel, p_date: date,
+          p_gross: gross, p_orders: orders, p_fee: fee, p_payout: payout, p_source_ref: reference, p_note: note, p_key: key, p_expected_version: version })
+        if (error?.message?.includes('external_report_version_conflict')) return json({ error: '別の更新があります。画面を再読み込みして確認してください' }, 409)
+        if (error) throw error
+        return json(saved)
+      }
       const date = String(body.expense_date || ''), amount = Number(body.amount), category = String(body.category || '').trim(), name = String(body.name || '').trim(), vendor = String(body.vendor_name || '').trim()
       const tax = String(body.tax_category || 'unknown'), key = String(body.entry_key || '')
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date || !Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000000 || !category || category.length > 80 || !name || name.length > 200 || vendor.length > 200 || !['unknown','taxable_10','taxable_8','non_taxable','exempt','out_of_scope'].includes(tax) || !/^[0-9a-f-]{36}$/i.test(key)) return json({ error: '経費の入力を確認してください' }, 400)
