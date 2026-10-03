@@ -36,6 +36,28 @@
       const action = element('a', '', '確認する →'); action.href = destinations[advice.destination] || '#checks'; box.append(action); parent.append(box)
     }
   }
+  function renderCurrentMonth(data) {
+    const decision = data.current_month_decision, section = $('current-month-section')
+    section.hidden = !decision
+    if (!decision) return
+    const box = $('current-month-decision'); box.replaceChildren()
+    $('current-month-heading').textContent = `${decision.month}月の売上を早めに見る`
+    const history = decision.history
+    if (decision.reference === null) {
+      box.append(element('p', 'muted', '前年・前々年の同月実績がまだ揃っていません。実績が蓄積されると、今月の先回り判断に使えます。'))
+    } else {
+      box.append(element('p', '', `${history[0].year}年 ${yen(history[0].sales)} → ${history[1].year}年 ${yen(history[1].sales)}（${decision.historical_change_percent > 0 ? '+' : ''}${decision.historical_change_percent}%）`))
+      box.append(element('p', '', `今年の目安：前年と同じなら ${yen(decision.reference)} ／ 過去の変化が続けば ${yen(decision.trend)}`))
+      if (decision.risk) box.append(element('p', 'insight', '売上が下がる可能性があります。今月のうちに客数と単価を確認し、施策を決めましょう。'))
+    }
+    if (decision.month_to_date !== null) {
+      box.append(element('p', '', `${decision.as_of}までの会計済み売上 ${yen(decision.month_to_date)} ／ 暦日換算の月末参考値 ${yen(decision.simple_run_rate)}`))
+      if (decision.gap_to_reference > 0) box.append(element('p', '', `前年同月の売上まで、単純換算であと ${yen(decision.gap_to_reference)}`))
+    } else box.append(element('p', 'muted', '今月の会計済み売上はまだ記録されていません。'))
+    if (decision.risk) for (const action of decision.actions) box.append(element('p', '', '・' + action))
+    box.append(element('p', 'muted small', decision.note))
+    const action = element('a', '', '日別売上で確認する →'); action.href = link('/sales-report.html', `${data.year}-${String(decision.month).padStart(2, '0')}`); box.append(action)
+  }
   function renderInsights(data) {
     const parent = $('insights'), x = data.selected, notes = []
     if (!hasData(x)) notes.push('この年はまだ記録がありません。売上と経費を入力すると、変化の理由を確認できます。')
@@ -114,7 +136,7 @@
     $('summary-pills').replaceChildren(pill('前年同期間比', data.yoy_sales_percent === null ? '比較データなし' : `${data.yoy_sales_percent > 0 ? '+' : ''}${data.yoy_sales_percent}%`), pill('参考利益', hasData(x) ? yen(x.estimated_profit) : '—'))
     $('no-data').hidden = hasData(x)
     $('metrics').replaceChildren(metric('来店組数', hasData(x) ? x.visit_count + '組' : '—'), metric('1組あたり売上', x.visit_count ? yen(Math.round(x.sales / x.visit_count)) : '—'), metric('注文数', hasData(x) ? x.order_count + '件' : '—'), metric('人件費率', x.sales ? x.labor_ratio + '%' : '—'), metric('経費', hasData(x) ? yen(x.expenses) : '—'), metric('売上のある月', data.months.filter(m => m.order_count > 0).length + 'か月'))
-    renderGuidance(data); renderInsights(data); renderYears(data); renderMonths(data)
+    renderCurrentMonth(data); renderGuidance(data); renderInsights(data); renderYears(data); renderMonths(data)
     const pl = $('pl'); pl.replaceChildren()
     for (const [label, value, bold] of [['売上（税込）', x.sales], ['商品原価の概算', -x.estimated_cogs], ['粗利益の参考値', x.estimated_gross_profit], ['人件費', -x.labor], ['販売手数料の概算', -x.channel_fees], ['経費', -x.expenses], ['廃棄', -x.waste], ['賄い・スタッフ消費', -x.staff_consumption], ['参考利益', x.estimated_profit, true]]) line(pl, label, yen(value), bold ? 'total' : '')
     renderCategories(data)
@@ -145,7 +167,7 @@
   for (let month = 1; month <= 12; month++) {
     const option = document.createElement('option'); option.value = String(month).padStart(2, '0'); option.textContent = month + '月'; $('compare-month').append(option)
   }
-  $('compare-month').value = params.get('compare_month') || String(Math.max(1, Number(today.slice(5, 7)) - 1)).padStart(2, '0')
+  $('compare-month').value = params.get('compare_month') || today.slice(5, 7)
   $('go').addEventListener('click', load)
   $('store').addEventListener('change', () => { localStorage.setItem('machi_store_id', $('store').value); load() })
   document.querySelectorAll('[data-span]').forEach(button => button.addEventListener('click', () => { span = Number(button.dataset.span); document.querySelectorAll('[data-span]').forEach(item => item.setAttribute('aria-pressed', String(item === button))); load() }))
