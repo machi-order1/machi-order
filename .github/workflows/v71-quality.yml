@@ -29,6 +29,8 @@ jobs:
         run: node scripts/build-cloudflare-pages.mjs
       - name: Check financial report calculations
         run: node --experimental-strip-types scripts/test-financial-report.mjs
+      - name: Check external channel CSV import
+        run: node scripts/test-external-channel-csv.cjs
       - name: Check receipt and invoice OCR suggestions
         run: node --experimental-strip-types scripts/test-receipt-parser.mjs && node --experimental-strip-types scripts/test-invoice-parser.mjs
       - name: Run V71 regression checks
