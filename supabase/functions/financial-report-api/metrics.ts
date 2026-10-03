@@ -71,3 +71,43 @@ export function guideBusiness(rows: Month[], year: number, today: string): Guida
   if (!items.length) items.push({ priority: 'normal', title: '同じ月の推移を確認する', evidence: '現在の登録データで大きな欠落は検出されていません。', next: '前年の同月と組数・単価を比べてください。', destination: 'comparison' })
   return items.slice(0, 3)
 }
+
+export function annualView(rows: Month[], year: number, span: number, today: string) {
+  const years = Array.from({ length: span }, (_, index) => {
+    const y = year - span + 1 + index
+    const summary = summarize(rows.filter(row => Number(row.month.slice(0, 4)) === y))
+    return { year: y, ...summary, has_data: Boolean(summary.order_count || summary.expense_count || summary.closed_days || summary.labor) }
+  })
+  const months = rows.filter(row => Number(row.month.slice(0, 4)) === year).map(row => ({
+    ...row,
+    estimated_profit: n(row.sales) - n(row.estimated_cogs) - n(row.labor) - n(row.expenses) - n(row.waste) - n(row.staff_consumption) - n(row.channel_fees),
+  }))
+  const yoy = yearOverYear(rows, year, today)
+  return { months, years, selected: summarize(months), comparisons: Array.from({ length: 12 }, (_, index) => comparison(rows, year, index + 1)),
+    guidance: guideBusiness(rows, year, today), current_month_decision: currentMonthDecision(rows, year, today), yoy_sales_percent: yoy.percent, yoy_completed_months: yoy.months }
+}
+
+export function currentMonthDecision(rows: Month[], year: number, today: string) {
+  if (year !== Number(today.slice(0, 4))) return null
+  const month = Number(today.slice(5, 7)), day = Number(today.slice(8, 10))
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const get = (y: number) => rows.find(row => Number(row.month.slice(0, 4)) === y && Number(row.month.slice(5, 7)) === month)
+  const earlier = get(year - 2), previous = get(year - 1), current = get(year)
+  const valid = (row: Month | undefined) => Boolean(row && n(row.order_count) > 0)
+  const history = [earlier, previous].map((row, index) => ({ year: year - 2 + index, sales: valid(row) ? n(row!.sales) : null,
+    visits: valid(row) ? n(row!.visit_count) : null, average_visit: valid(row) && n(row!.visit_count) ? Math.round(n(row!.sales) / n(row!.visit_count)) : null }))
+  const complete = valid(earlier) && valid(previous)
+  const reference = complete ? n(previous!.sales) : null
+  const trend = complete ? Math.max(0, 2 * n(previous!.sales) - n(earlier!.sales)) : null
+  const historical_change_percent = complete && n(earlier!.sales) ? Math.round((n(previous!.sales) / n(earlier!.sales) - 1) * 1000) / 10 : null
+  const month_to_date = valid(current) ? n(current!.sales) : null
+  const simple_run_rate = month_to_date === null ? null : Math.round(month_to_date / day * days)
+  const gap_to_reference = simple_run_rate === null || reference === null ? null : Math.max(0, reference - simple_run_rate)
+  const visitsFell = complete && n(earlier!.visit_count) && n(previous!.visit_count) < n(earlier!.visit_count)
+  const actions = visitsFell
+    ? ['来店組数が減った可能性を確認。曜日・時間帯別の客数を見て、対象を絞った告知や再来店券を検討。', '販促費と値引きを決め、追加売上だけでなく粗利で効果を測る。']
+    : ['曜日・時間帯別の来店組数と客単価を確認し、落ちている方に合わせて施策を選ぶ。', '告知・サービス券を試す場合は、費用と値引き後の粗利で効果を測る。']
+  return { month, as_of: today, elapsed_days: day, days_in_month: days, history, month_to_date, simple_run_rate,
+    reference, trend, historical_change_percent, gap_to_reference, risk: complete && (historical_change_percent! < -5 || (day >= 7 && simple_run_rate !== null && simple_run_rate < reference! * 0.9)),
+    actions, note: '今月の見通しは暦日で単純換算した参考値です。曜日・営業日・イベント・予約・値上げを反映せず、月初は特に変動します。' }
+}
