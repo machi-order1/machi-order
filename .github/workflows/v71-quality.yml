@@ -39,6 +39,8 @@ jobs:
         run: node --check journal-sources.js && node --experimental-strip-types --check supabase/functions/accounting-sources-api/index.ts
       - name: Check cash reconciliation labels
         run: node scripts/test-cash-reconciliation.cjs
+      - name: Check settlement CSV and API syntax
+        run: node scripts/test-settlement-csv.cjs && node --check settlement-review.js && node --experimental-strip-types --check supabase/functions/settlement-api/index.ts
       - name: Check receipt and invoice OCR suggestions
         run: node --experimental-strip-types scripts/test-receipt-parser.mjs && node --experimental-strip-types scripts/test-invoice-parser.mjs
       - name: Run V71 regression checks

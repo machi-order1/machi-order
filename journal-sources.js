@@ -39,6 +39,7 @@
       table('expenses',['日付','金額','内容・取引先','確認'],expenses,row=>[row.date,yen(row.amount),`${row.detail} ／ ${row.vendor||'取引先未入力'}`,row.changed_after_link?'元データ変更あり':row.linked_entry_id?'仕訳に紐付け済み':`${row.tax_category==='unknown'?'税区分未確認・':''}${row.has_receipt?'証憑あり':'証憑未連携'}・未転記`])
       $('status').textContent = '更新 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
       $('back').href = '/filing-readiness.html?store_id='+$('store').value+'&year='+month.slice(0,4)
+      $('settlement-link').href = '/settlement-review.html?store_id='+$('store').value+'&month='+month
       const page = new URL(location.href); page.searchParams.set('store_id',$('store').value); page.searchParams.set('month',month); history.replaceState(null,'',page)
     } catch (error) { $('status').className = 'muted error'; $('status').textContent = error.message; $('sales').textContent = $('cash').textContent = $('expenses').textContent = '取得できませんでした'; $('sales-summary').textContent = $('cash-summary').textContent = $('expenses-summary').textContent = '' }
     finally { $('refresh').disabled = false }
