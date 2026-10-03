@@ -50,7 +50,7 @@ Deno.serve(async request => {
     if (query.get('mode') === 'patterns') {
       // Complete months keep the early days of this month from distorting the pattern.
       const patternEnd = year === Number(localToday.slice(0, 4)) ? `${localToday.slice(0, 7)}-01` : end
-      const { data, error } = await sb.rpc('management_sales_patterns', { p_store_id: storeId, p_from: `${year}-01-01`, p_to: patternEnd })
+      const { data, error } = await sb.rpc('management_sales_channel_patterns', { p_store_id: storeId, p_from: `${year}-01-01`, p_to: patternEnd })
       if (error) throw error
       return json({ store_id: storeId, year, from: `${year}-01-01`, to_exclusive: patternEnd, basis: 'recorded_days', rows: data || [] })
     }
