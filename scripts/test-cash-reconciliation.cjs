@@ -1,0 +1,8 @@
+const assert = require('node:assert/strict')
+const { status, summary } = require('../cash-reconciliation.js')
+assert.equal(status({ cash_expected: 1000, cash_actual: 900, cash_difference: -100 }), '現金差額 −¥100')
+assert.equal(status({ cash_expected: 1000, cash_actual: 1000, cash_difference: 0 }), '現金差額0円')
+assert.match(status({ cash_expected: 1000, cash_actual: null, cash_difference: null }), /要確認/)
+assert.match(status({ cash_expected: 1000, cash_actual: 900, cash_difference: 0 }), /記録を確認/)
+assert.deepEqual(summary([{cash_actual:900,cash_difference:-100,paypay_sales:500},{cash_actual:null,cash_difference:null,paypay_sales:300}]), {count:2,difference_days:1,missing_days:1,paypay_sales:800})
+console.log('PASS cash differences, missing actuals, and payment totals')
