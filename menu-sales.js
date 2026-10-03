@@ -8,6 +8,7 @@
   $('date').value = params.get('date') || today
   const access = () => localStorage.machi_access_token || localStorage.mo_staff_token || localStorage.access_token || localStorage.sb_access_token || ''
   const yen = n => '¥' + Number(n || 0).toLocaleString('ja-JP')
+  const addDay = date => { const value = new Date(date + 'T00:00:00Z'); value.setUTCDate(value.getUTCDate() + 1); return value.toISOString().slice(0, 10) }
   const node = (tag, content) => { const result = document.createElement(tag); result.textContent = content; return result }
   const sum = (rows, key) => rows.reduce((total, row) => total + Number(row[key] || 0), 0)
   function table(parent, headings, rows) {
@@ -25,8 +26,9 @@
     $('period').textContent = `${data.from}〜${data.to_exclusive}の前日まで`
     $('quantity').textContent = product ? Number(product.quantity || 0).toLocaleString('ja-JP') : '—'
     $('amount').textContent = product ? yen(product.amount) : '—'
-    const rows = data.daily || [], slots = [['lunch','昼'],['dinner','夜'],['other','その他']]
-    table($('slots'), ['時間帯','販売数','明細金額'], slots.map(([key, label]) => { const hits = rows.filter(item => item.slot === key); return [label, `${sum(hits,'quantity').toLocaleString('ja-JP')}杯・点`, yen(sum(hits,'amount'))] }))
+    const rows = data.daily || [], recordedDays = new Set(data.recorded_days || []), slots = [['lunch','昼'],['dinner','夜'],['other','その他']]
+    $('record-note').textContent = '記録のある営業日でこの商品が売れなかった場合は0、店舗の売上・締め記録がない日は「記録なし」です。'
+    table($('slots'), ['時間帯','販売数','明細金額'], slots.map(([key, label]) => { const hits = rows.filter(item => item.slot === key); return [label, recordedDays.size ? `${sum(hits,'quantity').toLocaleString('ja-JP')}杯・点` : '記録なし', recordedDays.size ? yen(sum(hits,'amount')) : '—'] }))
     const annual = ['this_year','last_year'].includes(data.range)
     $('detail-heading').textContent = annual ? '月ごとの動き' : data.range === 'today' || data.range === 'date' ? '時間帯ごとの売上' : '日ごとの動き'
     const buckets = new Map()
@@ -39,10 +41,17 @@
       buckets.set(key, current)
     }
     const isDay = data.range === 'today' || data.range === 'date'
-    const detailRows = [...buckets].sort(([a],[b]) => a.localeCompare(b)).map(([key, value]) => isDay
-      ? [key, `${value.quantity.toLocaleString('ja-JP')}杯・点`, yen(value.amount)]
-      : [key, `${value.lunch.quantity} / ${yen(value.lunch.amount)}`, `${value.dinner.quantity} / ${yen(value.dinner.amount)}`, `${value.other.quantity} / ${yen(value.other.amount)}`, `${value.quantity} / ${yen(value.amount)}`])
-    table($('details'), isDay ? ['時間帯','販売数','明細金額'] : [annual ? '月' : '日付','昼 杯・点 / 金額','夜 杯・点 / 金額','その他 杯・点 / 金額','合計 杯・点 / 金額'], detailRows.length ? detailRows : [isDay ? ['記録なし','—','—'] : ['記録なし','—','—','—','—']])
+    const calendar = []
+    for (let date = data.from; date < data.to_exclusive; date = addDay(date)) calendar.push(date)
+    const keys = isDay ? slots.map(([, label]) => label) : [...new Set(calendar.map(date => annual ? date.slice(0, 7) : date))]
+    const detailRows = keys.map(key => {
+      const hasRecord = isDay ? recordedDays.size > 0 : annual ? [...recordedDays].some(date => date.startsWith(key)) : recordedDays.has(key)
+      if (!hasRecord) return isDay ? [key,'記録なし','—'] : [key,'記録なし','—','—','—']
+      const value = buckets.get(key) || { quantity: 0, amount: 0, lunch: { quantity: 0, amount: 0 }, dinner: { quantity: 0, amount: 0 }, other: { quantity: 0, amount: 0 } }
+      return isDay ? [key, `${value.quantity.toLocaleString('ja-JP')}杯・点`, yen(value.amount)]
+        : [key, `${value.lunch.quantity} / ${yen(value.lunch.amount)}`, `${value.dinner.quantity} / ${yen(value.dinner.amount)}`, `${value.other.quantity} / ${yen(value.other.amount)}`, `${value.quantity} / ${yen(value.amount)}`]
+    })
+    table($('details'), isDay ? ['時間帯','販売数','明細金額'] : [annual ? '月' : '日付','昼 杯・点 / 金額','夜 杯・点 / 金額','その他 杯・点 / 金額','合計 杯・点 / 金額'], detailRows)
     const alcohol = data.alcohol || []
     table($('alcohol'), ['アルコール','ハッピーアワーの杯数','それ以外の杯数','未判定'], alcohol.length
       ? alcohol.map(item => [item.name, `${Number(item.happy_quantity || 0)}杯`, `${Number(item.other_quantity || 0)}杯`, `${Number(item.unknown_quantity || 0)}杯`])
