@@ -111,3 +111,18 @@ export function currentMonthDecision(rows: Month[], year: number, today: string)
     reference, trend, historical_change_percent, gap_to_reference, risk: complete && (historical_change_percent! < -5 || (day >= 7 && simple_run_rate !== null && simple_run_rate < reference! * 0.9)),
     actions, note: '今月の見通しは暦日で単純換算した参考値です。曜日・営業日・イベント・予約・値上げを反映せず、月初は特に変動します。' }
 }
+
+export function menuDateRange(today: string, range: string, requestedDate: string) {
+  const addDays = (date: string, count: number) => { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + count); return d.toISOString().slice(0, 10) }
+  const firstMonth = today.slice(0, 7) + '-01'
+  const weekStart = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7))
+  let from = today, to = addDays(today, 1)
+  if (range === 'date') { from = requestedDate; to = addDays(from, 1) }
+  if (range === 'this_week') { from = weekStart; to = addDays(today, 1) }
+  if (range === 'last_week') { from = addDays(weekStart, -7); to = weekStart }
+  if (range === 'this_month') { from = firstMonth; to = addDays(today, 1) }
+  if (range === 'last_month') { to = firstMonth; from = addDays(firstMonth, -1).slice(0, 7) + '-01' }
+  if (range === 'this_year') { from = today.slice(0, 4) + '-01-01'; to = addDays(today, 1) }
+  if (range === 'last_year') { const year = Number(today.slice(0, 4)); from = `${year - 1}-01-01`; to = `${year}-01-01` }
+  return { from, to }
+}
