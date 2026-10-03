@@ -5,4 +5,5 @@
 <section class="card"><div class="controls"><label>店舗<select id="store"><option value="1">151 長浜店</option><option value="2">151 白木原店</option></select></label><label>対象月<input id="month" type="month"></label><button id="refresh" type="button">表示</button></div><p id="status" class="muted" role="status" aria-live="polite"></p></section>
 <section class="card"><h2>この月の記録</h2><p id="summary" class="muted">読み込み中…</p><p><a id="source-link" href="/journal-sources.html">日次締めと経費の元データを見る →</a></p><p><a id="settlement-link" href="/settlement-review.html">入金明細を見る →</a></p></section>
 <section class="card"><h2>確認すること</h2><div id="checks" role="status" aria-live="polite">読み込み中…</div><p id="note" class="muted"></p></section>
+<section class="card"><h2>経費・請求書・レシートの重複候補</h2><p class="muted">同じ店舗・金額・取引先で日付が31日以内の組を探します。請求書の下書きも含みます。請求日と購入日は異なることがあり、候補は二重計上の確定ではありません。原本と支払内容を確認してください。</p><div id="duplicates" role="status" aria-live="polite">読み込み中…</div></section>
 </main><script src="/monthly-review-rules.js"></script><script src="/monthly-review.js" defer></script></body></html>
