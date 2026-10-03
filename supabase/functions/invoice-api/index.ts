@@ -43,11 +43,11 @@ Deno.serve(async r=>{
    let query=db.from('supplier_invoices').select('id,created_by,created_at,vendor_name,invoice_number,invoice_date,due_date,amount,tax_category,status,paid_amount,note,ocr_text').eq('store_id',sid).order('created_at',{ascending:false}).limit(250)
    if(!manager)query=query.eq('created_by',user.id)
    const {data,error}=await query;if(error)throw error
-   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),rows=(data||[]).sort((a:any,b:any)=>{
-    const rank=(x:any)=>x.status==='open'&&x.due_date<today?0:x.status==='draft'?1:x.status==='open'?2:3
+   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),week=new Date(today+'T00:00:00Z');week.setUTCDate(week.getUTCDate()+7);const soon=week.toISOString().slice(0,10),rows=(data||[]).sort((a:any,b:any)=>{
+    const rank=(x:any)=>x.status==='open'&&x.due_date<today?0:x.status==='draft'?1:x.status==='open'&&x.due_date<=soon?2:x.status==='open'?3:4
     return rank(a)-rank(b)||b.created_at.localeCompare(a.created_at)
    })
-   return out({manager,items:rows,limited:rows.length===250,overdue:rows.filter((x:any)=>x.status==='open'&&x.due_date<today).length,unpaid:rows.filter((x:any)=>x.status==='open').reduce((n:number,x:any)=>n+Number(x.amount-x.paid_amount),0),drafts:rows.filter((x:any)=>x.status==='draft').length})
+   return out({manager,items:rows,limited:rows.length===250,overdue:rows.filter((x:any)=>x.status==='open'&&x.due_date<today).length,due_soon:rows.filter((x:any)=>x.status==='open'&&x.due_date>=today&&x.due_date<=soon).length,unpaid:rows.filter((x:any)=>x.status==='open').reduce((n:number,x:any)=>n+Number(x.amount-x.paid_amount),0),drafts:rows.filter((x:any)=>x.status==='draft').length})
   }
   if(!manager)return out({error:'店長権限が必要です'},403)
   if(r.method==='POST'&&mode==='confirm'){
@@ -73,7 +73,16 @@ Deno.serve(async r=>{
    const summary=(a:string,b:string)=>{const rows=(iv.data||[]).filter((x:any)=>x.status!=='draft'&&x.invoice_date>=a&&x.invoice_date<b),sales=(orders.data||[]).filter((x:any)=>x.business_date>=a&&x.business_date<b);return{invoice_total:rows.reduce((n:number,x:any)=>n+Number(x.amount||0),0),sales_total:sales.reduce((n:number,x:any)=>n+Number(x.total||0),0),invoice_count:rows.length}}
    const current=summary(from,end),previous=summary(prev,from),percent=(a:number,b:number)=>b?Math.round((a/b-1)*1000)/10:null,share=(x:any)=>x.sales_total?Math.round(x.invoice_total/x.sales_total*1000)/10:null
    const vendors=new Map<string,number>();for(const x of iv.data||[])if(x.invoice_date>=from&&x.invoice_date<end&&x.status!=='draft')vendors.set(x.vendor_name||'未確認',(vendors.get(x.vendor_name||'未確認')||0)+Number(x.amount||0))
-   return out({month,current,previous,invoice_change_percent:percent(current.invoice_total,previous.invoice_total),sales_change_percent:percent(current.sales_total,previous.sales_total),invoice_to_sales_percent:share(current),previous_invoice_to_sales_percent:share(previous),top_vendors:[...vendors].sort((a,b)=>b[1]-a[1]).slice(0,5),truncated:(iv.data||[]).length===2000||(orders.data||[]).length===10000,basis:'請求日基準の請求額と会計済み税込売上の参考比較。仕入原価、消費税の控除、損益計算書には自動転記していません。'})
+   const currentVendors=[...vendors].sort((a,b)=>b[1]-a[1]).slice(0,5),insights:string[]=[]
+   if(current.invoice_total>previous.invoice_total&&current.sales_total<previous.sales_total&&previous.sales_total>0&&previous.invoice_total>0)
+    insights.push('売上が前月より減る一方で請求額が増えています。取引先別の増加と発注数量・単価を確認してください。')
+   const currentShare=share(current),previousShare=share(previous)
+   if(currentShare!==null&&previousShare!==null&&currentShare>previousShare+5)
+    insights.push('売上に対する請求額の割合が前月より5ポイント以上増えています。営業日数と仕入タイミングも合わせて確認してください。')
+   if(current.invoice_total>0&&currentVendors[0]&&currentVendors[0][1]/current.invoice_total>=0.4)
+    insights.push(`${currentVendors[0][0]}の請求額が今月の${Math.round(currentVendors[0][1]/current.invoice_total*100)}%を占めます。単価や契約条件の変化を確認してください。`)
+   if(!current.invoice_count)insights.push('この月の確定請求書はありません。写真の確認待ちがないか一覧を確認してください。')
+   return out({month,current,previous,insights,invoice_change_percent:percent(current.invoice_total,previous.invoice_total),sales_change_percent:percent(current.sales_total,previous.sales_total),invoice_to_sales_percent:share(current),previous_invoice_to_sales_percent:share(previous),top_vendors:currentVendors,truncated:(iv.data||[]).length===2000||(orders.data||[]).length===10000,basis:'請求日基準の請求額と会計済み税込売上の参考比較。仕入原価、消費税の控除、損益計算書には自動転記していません。'})
   }
   return out({error:'操作が見つかりません'},404)
  }catch(e){console.error(e);return out({error:'処理に失敗しました。もう一度お試しください'},500)}
