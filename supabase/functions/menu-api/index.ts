@@ -101,6 +101,7 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await sb.rpc('place_customer_order_idempotent', { p_qr_token: token, p_items: normalized, p_client_order_key: requestId })
       if (error) {
         const message = String(error.message || '')
+        if (message.includes('注文識別番号と席')) return out({ error: '別の席で使われた注文番号です。店員に確認してください' }, 409)
         if (message.includes('営業時間外')) return out({ error: '現在は営業時間外です' }, 409)
         if (message.includes('注文受付を停止')) return out({ error: '現在、注文受付を一時停止しています' }, 409)
         if (message.includes('売り切れ') || message.includes('販売停止') || message.includes('現在注文できません')) return out({ error: '売り切れ・販売停止の商品が含まれています' }, 409)
