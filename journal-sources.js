@@ -29,15 +29,18 @@
       const data = await response.json().catch(()=>({}))
       if (response.status === 401) { location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search)); return }
       if (!response.ok) throw Error(data.error || '取得できませんでした')
-      const sales = data.sales_rows || [], expenses = data.expense_rows || []
+      const sales = data.sales_rows || [], expenses = data.expense_rows || [], cash = data.cash_rows || []
       $('sales-summary').textContent = `${sales.length}日分 ／ ${yen(sales.reduce((sum,row)=>sum+Number(row.amount||0),0))}。仕訳への転記は行っていません。`
       $('expenses-summary').textContent = `${expenses.length}件 ／ ${yen(expenses.reduce((sum,row)=>sum+Number(row.amount||0),0))}。請求書・仕入との重複を確認してください。`
       table('sales',['営業日','売上','内容','確認'],sales,row=>[row.date,yen(row.amount),row.detail,row.changed_after_link?'元データ変更あり':row.linked_entry_id?'仕訳に紐付け済み':'未転記'])
+      const cashSummary = window.MACHI_CASH_RECONCILIATION.summary(cash)
+      $('cash-summary').textContent = `${cashSummary.count}日分 ／ 現金差額あり ${cashSummary.difference_days}日 ／ 実在高未入力 ${cashSummary.missing_days}日 ／ PayPay売上 ${yen(cashSummary.paypay_sales)}。入金明細は未照合です。`
+      table('cash',['営業日','現金売上','予定現金','実際の現金','PayPay売上','その他売上','確認'],cash,row=>[row.date,yen(row.cash_sales),yen(row.cash_expected),row.cash_actual===null?'未入力':yen(row.cash_actual),yen(row.paypay_sales),yen(row.other_sales),window.MACHI_CASH_RECONCILIATION.status(row)])
       table('expenses',['日付','金額','内容・取引先','確認'],expenses,row=>[row.date,yen(row.amount),`${row.detail} ／ ${row.vendor||'取引先未入力'}`,row.changed_after_link?'元データ変更あり':row.linked_entry_id?'仕訳に紐付け済み':`${row.tax_category==='unknown'?'税区分未確認・':''}${row.has_receipt?'証憑あり':'証憑未連携'}・未転記`])
       $('status').textContent = '更新 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
       $('back').href = '/filing-readiness.html?store_id='+$('store').value+'&year='+month.slice(0,4)
       const page = new URL(location.href); page.searchParams.set('store_id',$('store').value); page.searchParams.set('month',month); history.replaceState(null,'',page)
-    } catch (error) { $('status').className = 'muted error'; $('status').textContent = error.message; $('sales').textContent = $('expenses').textContent = '取得できませんでした'; $('sales-summary').textContent = $('expenses-summary').textContent = '' }
+    } catch (error) { $('status').className = 'muted error'; $('status').textContent = error.message; $('sales').textContent = $('cash').textContent = $('expenses').textContent = '取得できませんでした'; $('sales-summary').textContent = $('cash-summary').textContent = $('expenses-summary').textContent = '' }
     finally { $('refresh').disabled = false }
   }
   $('refresh').addEventListener('click',load)
