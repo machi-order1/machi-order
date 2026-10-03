@@ -157,6 +157,14 @@
     </header>
     <main class="wrap">
       <div class="clock" id="clock"></div>
+      <section class="card hide" id="face-panel">
+        <h2>顔で名前を探す <small>試験運用</small></h2>
+        <p class="muted">顔確認の後にPINで本人確認します。名前を選んで打刻することもできます。</p>
+        <video id="face-video" autoplay muted playsinline hidden style="width:100%;max-height:300px;object-fit:cover;border-radius:14px;transform:scaleX(-1)"></video>
+        <p id="face-message" role="status" aria-live="polite"></p>
+        <button class="btn red" id="face-start">顔を確認する</button>
+        <button class="btn outline" id="face-cancel" style="margin-top:10px">名前・PINで進む</button>
+      </section>
       <section class="card setup hide" id="setup">
         <h2>この端末を登録</h2>
         <p class="muted">
@@ -209,6 +217,13 @@
         </button>
         <button class="btn outline" id="lock">終了して名前選択へ</button>
       </div>
+      <section class="card hide" id="face-settings">
+        <h2>自分の顔を登録・削除</h2>
+        <p class="muted">登録は任意です。店舗の名前確認に使う顔の特徴データを保存します。写真は保存しません。削除後もPINで打刻できます。</p>
+        <label><input type="checkbox" id="face-consent"> 上の内容を確認し、顔の特徴データの登録に同意します</label>
+        <button class="btn outline" id="face-enroll" style="margin-top:12px">顔を3回確認して登録</button>
+        <button class="btn outline" id="face-delete" style="margin-top:10px">自分の顔登録を削除する</button>
+      </section>
       <section class="card hide" id="requests">
         <h2>シフト希望</h2>
         <p class="muted">
@@ -247,6 +262,7 @@
       </section>
       <div class="msg" id="msg" role="alert"></div>
     </main>
+    <script src="/attendance-face.js"></script>
     <script>
       (() => {
         const API =
@@ -262,7 +278,8 @@
           pin = "",
           snapshot = null,
           lockTimer = null,
-          busy = false;
+          busy = false,
+          session = 0;
         const esc = (s) =>
           String(s ?? "").replace(
             /[&<>"']/g,
@@ -302,19 +319,31 @@
           const headers = { "Content-Type": "application/json" };
           if (manager) headers.Authorization = "Bearer " + managerToken();
           else if (deviceToken()) headers["x-kiosk-token"] = deviceToken();
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 8000);
+          try {
           const r = await fetch(API, {
               method,
               headers,
               body: body ? JSON.stringify(body) : undefined,
+              signal: controller.signal,
             }),
-            j = await r.json().catch(() => ({}));
+            j = await r.json();
           if (!r.ok)
             throw Object.assign(Error(j.error || "処理できませんでした"), {
               status: r.status,
             });
           return j;
+          } catch (e) {
+            if (!e.status) throw Error("通信を確認できませんでした。打刻は完了した可能性があります。再打刻の前に現在の状態を確認してください。");
+            throw e;
+          } finally { clearTimeout(timer); }
         }
         function choose(x) {
+          if (busy || !x) return;
+          session++;
+          window.MachiFace?.choose();
+          $("#face-panel").classList.add("hide");
           selected = x;
           $("#selected-name").textContent = x.display_name + "さん";
           $("#chooser").classList.add("hide");
@@ -324,6 +353,12 @@
           setMsg("");
         }
         function showRoster() {
+          if (busy) return;
+          session++;
+          window.MachiFace?.reset();
+          $("#face-panel").hidden = false;
+          $("#face-panel").classList.remove("hide");
+          $("#face-settings").classList.add("hide");
           $("#pin").value = "";
           $("#requests").classList.add("hide");
           $("#request-list").textContent = "";
@@ -361,6 +396,7 @@
           $("#pin-card").classList.add("hide");
           $("#status").classList.remove("hide");
           $("#actions").classList.remove("hide");
+          $("#face-settings").classList.remove("hide");
           $("#state").textContent = !working
             ? "未出勤"
             : onBreak
@@ -376,51 +412,72 @@
           lockTimer = setTimeout(showRoster, 30000);
         }
         async function status() {
+          if (busy) return;
           pin = $("#pin").value.trim();
           if (!selected || !/^[0-9]{4,8}$/.test(pin)) {
             setMsg("4〜8桁の暗証番号を入力してください");
             return;
           }
+          const thisSession = session;
+          busy = true;
+          clearTimeout(lockTimer);
           try {
             $("#open").disabled = true;
             snapshot = await api("POST", {
               action: "status",
               staff_id: selected.id,
               pin,
+              attempt_id: window.MachiFace?.attemptId(),
             });
+            if (thisSession !== session) return;
             renderStatus();
-            setMsg("");
+            setMsg(snapshot.face_log_saved === false ? "PINで本人確認できました。顔確認の履歴は保存できませんでしたが、打刻は続けられます。" : "");
           } catch (e) {
             setMsg(e.message);
             $("#pin").value = "";
             $("#pin").focus();
           } finally {
+            busy = false;
             $("#open").disabled = false;
           }
         }
         async function act(action) {
           if (busy || !selected) return;
           busy = true;
+          clearTimeout(lockTimer);
+          window.MachiFace?.choose();
           document
             .querySelectorAll("#actions button")
             .forEach((b) => (b.disabled = true));
           try {
-            await api("POST", { action, staff_id: selected.id, pin });
-            setMsg(
-              {
+            setMsg("記録しています。完了表示をお待ちください");
+            const receipt = await api("POST", { action, staff_id: selected.id, pin });
+            if (receipt.ok !== true) throw Error("打刻の完了を確認できませんでした。現在の状態を確認してください。");
+            const recordedAt = {clock_in: receipt.shift?.clock_in, clock_out: receipt.shift?.clock_out, break_start: receipt.break?.started_at}[action];
+            const confirmation = selected.display_name + "さん " +
+              (recordedAt ? fmt(recordedAt) + " " : "") + {
                 clock_in: "出勤を記録しました",
                 break_start: "休憩開始を記録しました",
                 break_end: "休憩終了を記録しました",
                 clock_out: "退勤を記録しました",
-              }[action],
+              }[action];
+            setMsg(
+              confirmation,
               true,
             );
+            // A failed status refresh must not turn a saved punch into an error.
+            try {
             snapshot = await api("POST", {
               action: "status",
               staff_id: selected.id,
               pin,
             });
             renderStatus();
+            } catch (_) {
+              $("#actions").classList.add("hide");
+              $("#face-settings").classList.add("hide");
+              setMsg(confirmation + "。現在の状態の再取得はできませんでした。", true);
+            }
             clearTimeout(lockTimer);
             lockTimer = setTimeout(showRoster, 3500);
           } catch (e) {
@@ -605,6 +662,10 @@
           }
         };
         $("#register").onclick = register;
+        window.MachiFace?.init({ api,
+          identify: (person) => choose(roster.find(x => x.id === person.id)),
+          credentials: () => { touchSession(); return selected && pin ? { staff_id: selected.id, pin } : null; },
+        });
         setInterval(tick, 1000);
         tick();
         init();

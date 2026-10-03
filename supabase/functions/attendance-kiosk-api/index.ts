@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.0";
 import { managerRequests, staffRequests } from "./requests.ts";
+import { faceAction } from "./faces.ts";
 
 const H = {
   "Access-Control-Allow-Origin": "*",
@@ -151,6 +152,18 @@ Deno.serve(async (req: Request) => {
     if (req.method !== "POST") return out({ error: "未対応の操作です" }, 405);
     const b = await req.json(),
       action = String(b.action || "");
+    if (action === "face_attempts") {
+      if (!manager) return out({ error: "店長ログインが必要です" }, 401);
+      const { data, error } = await sb.from("attendance_face_attempts")
+        .select("id,store_id,started_at,finished_at,outcome,reason,matched_staff_id,verified_staff_id,verified_at")
+        .in("store_id", companyStoreIds).order("started_at", { ascending: false }).limit(100);
+      if (error) throw error;
+      const ids = [...new Set((data || []).flatMap((x: any) => [x.matched_staff_id, x.verified_staff_id]).filter(Boolean))];
+      const { data: people, error: pe } = ids.length ? await sb.from("staff_roster")
+        .select("id,display_name").eq("company_id", companyId).in("id", ids) : { data: [], error: null };
+      if (pe) throw pe;
+      return out({ attempts: data || [], people: people || [], stores: manager.stores });
+    }
     if (["request_list", "request_review"].includes(action)) {
       if (!manager) return out({ error: "店長ログインが必要です" }, 401);
       return await managerRequests(sb, b, manager.user.id);
@@ -230,6 +243,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!device) return out({ error: "この端末は未登録です" }, 401);
+    if (["face_begin", "face_identify", "face_fallback"].includes(action)) {
+      const result = await faceAction(sb, b, device);
+      const { status, ...body } = result;
+      return out(body, status || 200);
+    }
     const staffId = Number(b.staff_id || 0),
       pin = String(b.pin || "");
     const { data: valid, error: ve } = await sb.rpc("verify_staff_kiosk_pin", {
@@ -243,6 +261,23 @@ Deno.serve(async (req: Request) => {
         { error: "暗証番号が違うか、一時的にロックされています" },
         401,
       );
+    if (["face_enroll", "face_delete"].includes(action)) {
+      const result = await faceAction(sb, b, device, staffId);
+      const { status, ...body } = result;
+      return out(body, status || 200);
+    }
+    // A face attempt only proves an unidentified person used the device.
+    // Attach identity only after successful PIN verification; never backdate wages.
+    let faceLogSaved = true;
+    if (action === "status" && b.attempt_id) {
+      const { error } = await sb.from("attendance_face_attempts").update({
+        verified_staff_id: staffId, verified_at: new Date().toISOString(),
+      }).eq("id", String(b.attempt_id)).eq("device_id", device.id)
+        .is("verified_staff_id", null)
+        .gte("started_at", new Date(Date.now() - 60000).toISOString());
+      // Failure to save optional face metadata must not block PIN attendance.
+      if (error) faceLogSaved = false;
+    }
     const { data: person } = await sb
       .from("staff_roster")
       .select("id,display_name,hourly_wage,auth_user_id")
@@ -285,6 +320,7 @@ Deno.serve(async (req: Request) => {
         .order("scheduled_start");
       return out({
         person: { id: person.id, display_name: person.display_name },
+        face_log_saved: faceLogSaved,
         current: { working: !!current, on_break: onBreak, shift: current },
         shifts: shifts || [],
       });
