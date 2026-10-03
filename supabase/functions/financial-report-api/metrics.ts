@@ -71,3 +71,18 @@ export function guideBusiness(rows: Month[], year: number, today: string): Guida
   if (!items.length) items.push({ priority: 'normal', title: '同じ月の推移を確認する', evidence: '現在の登録データで大きな欠落は検出されていません。', next: '前年の同月と組数・単価を比べてください。', destination: 'comparison' })
   return items.slice(0, 3)
 }
+
+export function annualView(rows: Month[], year: number, span: number, today: string) {
+  const years = Array.from({ length: span }, (_, index) => {
+    const y = year - span + 1 + index
+    const summary = summarize(rows.filter(row => Number(row.month.slice(0, 4)) === y))
+    return { year: y, ...summary, has_data: Boolean(summary.order_count || summary.expense_count || summary.closed_days || summary.labor) }
+  })
+  const months = rows.filter(row => Number(row.month.slice(0, 4)) === year).map(row => ({
+    ...row,
+    estimated_profit: n(row.sales) - n(row.estimated_cogs) - n(row.labor) - n(row.expenses) - n(row.waste) - n(row.staff_consumption) - n(row.channel_fees),
+  }))
+  const yoy = yearOverYear(rows, year, today)
+  return { months, years, selected: summarize(months), comparisons: Array.from({ length: 12 }, (_, index) => comparison(rows, year, index + 1)),
+    guidance: guideBusiness(rows, year, today), yoy_sales_percent: yoy.percent, yoy_completed_months: yoy.months }
+}
