@@ -1,0 +1,12 @@
+const assert = require('node:assert/strict')
+const { prepare, template } = require('../external-channel-csv.js')
+const valid = template + '2026-10-02,Uber Eats,15000,12,3000,12000,R-123,"返金,確認済み"\r\n2026-10-03,ロケットナウ,8000,6,1200,6800,,\r\n'
+const rows = prepare(valid, '2026-10', '2026-10-03', new Set(['2026-10-02:uber_eats']))
+assert.equal(rows.length, 2)
+assert.equal(rows[0].note, '返金,確認済み')
+assert.equal(rows[0].existing, true)
+assert.equal(rows[1].channel_code, 'rocket_now')
+assert.throws(() => prepare(valid.replace('2026-10-03,ロケットナウ', '2026-10-02,Uber Eats'), '2026-10', '2026-10-03'), /重複/)
+assert.throws(() => prepare(valid.replace('15000,12', '15,000,12'), '2026-10', '2026-10-03'), /列数/)
+assert.throws(() => prepare(valid.replace('2026-10-03,ロケットナウ', '2026-10-04,ロケットナウ'), '2026-10', '2026-10-03'), /営業日/)
+console.log('PASS external channel CSV quoting, month, future, duplicate and existing-row checks')
