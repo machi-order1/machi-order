@@ -22,3 +22,6 @@ node_modules/
 
 # Recovered historical packages used only during V71 migration
 legacy/
+
+# Reproducible static hosting output
+.cloudflare-pages-dist/
