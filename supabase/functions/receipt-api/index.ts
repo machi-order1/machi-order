@@ -101,16 +101,12 @@ Deno.serve(async request => {
     if (request.method === 'GET' && mode === 'month') {
       const month = String(query.get('month') || ''), start = `${month}-01`
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return reply({ error: '月を確認してください' }, 400)
-      const end = new Date(`${start}T00:00:00Z`); end.setUTCMonth(end.getUTCMonth()+1)
-      const endDate = end.toISOString().slice(0,10), zoneStart = `${start}T00:00:00+09:00`, zoneEnd = `${endDate}T00:00:00+09:00`
-      const [receipts, expenses, closing] = await Promise.all([
-        db.from('receipt_imports').select('id,extraction_status,confirmed').eq('store_id',storeId).gte('created_at',zoneStart).lt('created_at',zoneEnd),
-        db.from('store_expenses').select('amount,tax_category,voided_at').eq('store_id',storeId).gte('expense_date',start).lt('expense_date',endDate),
+      const [overview, closing] = await Promise.all([
+        db.rpc('expense_month_overview', { p_store_id: storeId, p_month: start }).single(),
         db.from('expense_month_closings').select('id,closed_at,expense_total,expense_count,receipt_count').eq('store_id',storeId).eq('month',start).maybeSingle()
       ])
-      if (receipts.error || expenses.error || closing.error) throw receipts.error || expenses.error || closing.error
-      const exp = (expenses.data || []).filter((x: any) => !x.voided_at)
-      return reply({ month, pending: (receipts.data || []).filter((x: any) => pendingStatuses.includes(x.extraction_status)).length, confirmed: (receipts.data || []).filter((x: any) => x.confirmed).length, unknown_tax: exp.filter((x: any) => x.tax_category === 'unknown').length, expense_total: exp.reduce((sum: number,x: any) => sum + Number(x.amount || 0), 0), closing: closing.data })
+      if (overview.error || closing.error) throw overview.error || closing.error
+      return reply({ month, ...overview.data, closing: closing.data })
     }
     if (request.method === 'POST' && mode === 'close') {
       const body = await request.json(), month = String(body.month || '')
