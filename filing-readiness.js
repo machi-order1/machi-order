@@ -40,6 +40,7 @@
       render(window.MACHI_FILING_READINESS.checks(report, receipt, invoice, $('store').value))
       $('status').textContent = '更新 ' + new Date().toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' })
       $('back').href = '/manager.html?store_id=' + $('store').value
+      $('source-link').href = '/journal-sources.html?store_id=' + $('store').value + '&month=' + year + '-01'
       const page = new URL(location.href); page.searchParams.set('store_id', $('store').value); page.searchParams.set('year', String(year)); history.replaceState(null, '', page)
     } catch (error) { $('status').className = 'muted error'; $('status').textContent = error.message; $('checks').textContent = '数字を確認できませんでした。更新してください。'; $('summary').textContent = '取得できません' }
     finally { $('refresh').disabled = false }
