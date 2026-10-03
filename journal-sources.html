@@ -4,6 +4,6 @@
 <section class="card notice"><b>現在は確認のみ</b><p>申告者と開始残高が未確認のため、仕訳へ自動転記しません。売上と経費を合算した利益を確定額として扱わず、請求書との重複・税区分・証憑を確認してください。</p></section>
 <section class="card"><div class="controls"><label>店舗<select id="store"><option value="1">151 長浜店</option><option value="2">151 白木原店</option></select></label><label>対象月<input id="month" type="month"></label><button id="refresh" type="button">表示</button></div><p id="status" class="muted" role="status" aria-live="polite"></p></section>
 <section class="card"><h2>日次締めの売上</h2><p id="sales-summary" class="muted"></p><div id="sales" class="tablewrap"></div><p class="muted">ここには締め済みの日だけを表示します。未締めの日は店長ホームで確認してください。</p></section>
-<section class="card"><h2>現金差額と決済内訳</h2><p id="cash-summary" class="muted"></p><div id="cash" class="tablewrap"></div><p class="muted">PayPay・その他の金額はPOSの売上内訳です。実際の振込や銀行入金との照合はまだ行っていません。</p></section>
+<section class="card"><h2>現金差額と決済内訳</h2><p id="cash-summary" class="muted"></p><div id="cash" class="tablewrap"></div><p class="muted">PayPay・その他の金額はPOSの売上内訳です。実際の振込や銀行入金との照合はまだ行っていません。</p><p><a id="settlement-link" href="/settlement-review.html">入金明細を記録・確認する →</a></p></section>
 <section class="card"><h2>登録経費</h2><p id="expenses-summary" class="muted"></p><div id="expenses" class="tablewrap"></div></section>
 </main><script src="/cash-reconciliation.js"></script><script src="/journal-sources.js" defer></script></body></html>
