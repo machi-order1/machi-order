@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict')
+const { recentDates, classify } = require('../daily-check.js')
+assert.deepEqual(recentDates('2026-03-01'), ['2026-02-28','2026-02-27','2026-02-26'])
+const summary = { business_date: '2026-10-02', order_count: 2, net_sales: 3000 }
+assert.match(classify({ summary, closing: null, cash_drawer: null }).text, /未締め/)
+assert.equal(classify({ summary, closing: { order_count: 2, net_sales: 3000 } }), null)
+assert.match(classify({ summary, closing: { order_count: 1, net_sales: 1500 } }).text, /締め後/)
+assert.equal(classify({ summary: { ...summary, order_count: 0, net_sales: 0 }, closing: null, cash_drawer: null }), null)
+assert.match(classify({ summary: { ...summary, order_count: 0, net_sales: 0 }, closing: null, cash_drawer: {} }).text, /売上ゼロ/)
+console.log('PASS daily closing and zero-sales review classification')
