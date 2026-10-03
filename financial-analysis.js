@@ -207,6 +207,7 @@
     for (const [label, number, unit] of [['原価未登録の商品明細', x.uncosted_items, '件'], ['締め済み営業日', x.closed_days, '日'], ['税区分が未確認の経費', x.unknown_tax_count, '件'], ['取引先が未記録の経費', x.missing_vendor_count, '件'], ['証憑が未連携の経費', x.missing_evidence_count, '件']]) q.append(element('span', '', `${label} ${number}${unit}`))
     const store = data.store_id
     $('back').href = '/manager.html?store_id=' + store
+    $('external-link').href = '/external-channel-sales.html?store_id=' + store
     $('daily').href = $('insight-daily').href = $('no-data-daily').href = '/sales-report.html?store_id=' + store
     renderComparison()
   }
