@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { summarize, comparison, yearOverYear, guideBusiness, csvCell, annualView } from '../supabase/functions/financial-report-api/metrics.ts'
+import { summarize, comparison, yearOverYear, guideBusiness, csvCell, annualView, currentMonthDecision } from '../supabase/functions/financial-report-api/metrics.ts'
 
 const row = (year, month, sales, orders = 1) => ({ month: `${year}-${String(month).padStart(2, '0')}-01`, sales, order_count: orders, visit_count: orders, guest_count: orders * 2,
   estimated_cogs: 20, uncosted_items: 1, labor: 10, expenses: 5, waste: 2, staff_consumption: 1, channel_fees: 3,
@@ -13,6 +13,14 @@ assert.deepEqual(report.months.map(item => item.month), ['2026-08-01', '2026-09-
 assert.equal(report.months[0].estimated_profit, 79)
 assert.equal(report.comparisons[7].projection.trend, 140)
 assert.equal(report.yoy_sales_percent, 40)
+const october = currentMonthDecision([row(2024, 10, 200, 4), row(2025, 10, 100, 2), row(2026, 10, 6, 1)], 2026, '2026-10-02')
+assert.equal(october.historical_change_percent, -50)
+assert.equal(october.trend, 0)
+assert.equal(october.simple_run_rate, 93)
+assert.equal(october.gap_to_reference, 7)
+assert.equal(october.risk, true)
+assert.equal(currentMonthDecision([row(2025, 10, 100)], 2026, '2026-10-02').reference, null)
+assert.equal(currentMonthDecision(rows, 2025, '2026-10-02'), null)
 const august = comparison(rows, 2026, 8)
 assert.equal(august.projection.flat, 120)
 assert.equal(august.projection.trend, 140)
