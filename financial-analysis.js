@@ -58,19 +58,46 @@
     box.append(element('p', 'muted small', decision.note))
     const action = element('a', '', '日別売上で確認する →'); action.href = link('/sales-report.html', `${data.year}-${String(decision.month).padStart(2, '0')}`); box.append(action)
   }
-  function renderPatterns(data) {
+  function renderPatterns(data, selectedChannel = 'all') {
     const parent = $('patterns'); parent.replaceChildren()
     const rows = data.rows || [], dayLabels = ['月','火','水','木','金','土','日']
+    const channels = [['all','すべて'],['dine_in','店内'],['takeout','テイクアウト'],['uber_eats','Uber Eats'],['rocket_now','ロケットナウ'],['other','その他']]
+    const monthly = rows.filter(row => row.dimension === 'month')
+    const channelTotal = code => monthly.filter(row => row.channel_code === code).reduce((sum, row) => sum + Number(row.sales || 0), 0)
+    const channelOrders = code => monthly.filter(row => row.channel_code === code).reduce((sum, row) => sum + Number(row.order_count || 0), 0)
     const rate = (value, days) => days ? Math.round(Number(value || 0) / days) : null
     const collect = (dimension, bucket) => {
-      const group = rows.filter(row => row.dimension === dimension && Number(row.bucket) === bucket)
+      const group = rows.filter(row => row.dimension === dimension && Number(row.bucket) === bucket && (selectedChannel === 'all' || row.channel_code === selectedChannel))
       const days = Number(group[0]?.recorded_days || 0)
-      return { days, lunch: rate(group.find(row => row.slot === 'lunch')?.visit_count, days), dinner: rate(group.find(row => row.slot === 'dinner')?.visit_count, days),
+      return { days, lunch: rate(group.filter(row => row.slot === 'lunch').reduce((sum, row) => sum + Number(row.visit_count || 0), 0), days), dinner: rate(group.filter(row => row.slot === 'dinner').reduce((sum, row) => sum + Number(row.visit_count || 0), 0), days),
         visits: rate(group.reduce((sum, row) => sum + Number(row.visit_count || 0), 0), days), sales: rate(group.reduce((sum, row) => sum + Number(row.sales || 0), 0), days) }
     }
     const periods = [['weekday', dayLabels], ['month_part', ['月初（1〜10日）','中旬（11〜20日）','月末（21日以降）']]]
     if (data.from >= data.to_exclusive) { parent.append(element('p', 'muted', 'この年は完了した月がまだありません。')); return }
     parent.append(element('p', 'muted', `${data.from}〜${data.to_exclusive}の前日までを集計。来店組数と売上は記録のある日あたりの平均です。`))
+    const channelCards = element('div', 'stats')
+    for (const [code, label] of channels.slice(1, 5)) channelCards.append(metric(label, channelOrders(code) ? yen(channelTotal(code)) : '記録なし'))
+    parent.append(channelCards)
+    const buttons = element('div', 'range')
+    for (const [code, label] of channels) {
+      const button = element('button', '', label); button.type = 'button'; button.setAttribute('aria-pressed', String(code === selectedChannel))
+      button.addEventListener('click', () => renderPatterns(data, code)); buttons.append(button)
+    }
+    parent.append(buttons)
+    parent.append(element('p', 'muted', `以下は「${channels.find(([code]) => code === selectedChannel)?.[1]}」の内訳です。`))
+    if (selectedChannel !== 'all' && !channelOrders(selectedChannel)) parent.append(element('p', 'muted', 'この販売方法の注文記録はありません。外部サービスの実績は連携・入力された注文だけが対象です。'))
+    parent.append(element('h3', '', '月ごとの販売方法別売上'))
+    const monthWrap = element('div', 'tablewrap'), monthTable = element('table'), monthHead = element('thead'), monthBody = element('tbody'), monthHeadRow = element('tr')
+    for (const label of ['月','店内','テイクアウト','Uber Eats','ロケットナウ','その他']) monthHeadRow.append(element('th', '', label))
+    monthHead.append(monthHeadRow)
+    for (let month = 1; month <= 12; month++) {
+      const entries = monthly.filter(row => Number(row.bucket) === month)
+      if (!entries.some(row => Number(row.recorded_days))) continue
+      const tr = element('tr'); tr.append(element('td', '', `${month}月`))
+      for (const [code] of channels.slice(1)) tr.append(element('td', '', yen(entries.find(row => row.channel_code === code)?.sales)))
+      monthBody.append(tr)
+    }
+    monthTable.append(monthHead, monthBody); monthWrap.append(monthTable); parent.append(monthWrap)
     for (const [dimension, labels] of periods) {
       parent.append(element('h3', '', dimension === 'weekday' ? '曜日ごと' : '月初・中旬・月末'))
       const wrap = element('div', 'tablewrap'), table = element('table'), head = element('thead'), body = element('tbody'), tr = element('tr')
