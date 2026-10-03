@@ -29,6 +29,7 @@
   }
   function cells(values) { const tr=node('tr',''); for(const value of values) { const cell=node('td',value); if(String(value).startsWith('¥'))cell.className='amount'; tr.append(cell) } return tr }
   function render() {
+    $('download').disabled=!entries.length
     const active=entries.filter(row=>!row.voided_at), totals=new Map()
     for(const row of active) totals.set(row.channel_code,(totals.get(row.channel_code)||0)+Number(row.amount_yen))
     $('entries-summary').textContent=`有効 ${active.length}件。PayPay入金記録 ${yen(totals.get('paypay'))} ／ カード ${yen(totals.get('card'))} ／ 現金入金 ${yen(totals.get('cash_deposit'))} ／ その他 ${yen(totals.get('other'))}。`
@@ -41,6 +42,7 @@
   }
   async function load() {
     if(!token()) { location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search)); return }
+    $('download').disabled=true; entries=[]
     $('status').className='muted'; $('status').textContent='読み込み中…'; $('refresh').disabled=true
     try {
       const data=await api('settlement-api'); entries=data.entries||[]; render()
@@ -52,7 +54,7 @@
       $('back').href='/journal-sources.html?store_id='+$('store').value+'&month='+$('month').value
       const page=new URL(location.href);page.searchParams.set('store_id',$('store').value);page.searchParams.set('month',$('month').value);history.replaceState(null,'',page)
       $('status').textContent='更新 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})
-    } catch(error) { $('status').className='muted error';$('status').textContent=error.message;$('entries').textContent='取得できませんでした';$('comparison').textContent='取得できませんでした';entries=[] }
+    } catch(error) { $('status').className='muted error';$('status').textContent=error.message;$('entries').textContent='取得できませんでした';$('comparison').textContent='取得できませんでした';entries=[];$('download').disabled=true }
     finally { $('refresh').disabled=false }
   }
   async function voidEntry(id) {
@@ -74,6 +76,11 @@
   $('template').addEventListener('click',()=>{
     const blob=new Blob([window.MACHI_SETTLEMENT_CSV.template],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=node('a','')
     link.href=url;link.download='入金明細_ひな形.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
+  })
+  $('download').addEventListener('click',()=>{
+    if(!entries.length)return
+    const blob=new Blob([window.MACHI_SETTLEMENT_EXPORT.csv(entries)],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=node('a','')
+    link.href=url;link.download=`入金明細_${$('store').value}_${$('month').value}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000)
   })
   $('csv-file').addEventListener('change',async event=>{
     const file=event.target.files?.[0],status=$('csv-status');prepared=[];$('csv-import').disabled=true;$('csv-preview').replaceChildren()
