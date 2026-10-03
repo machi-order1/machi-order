@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,content-type,apikey', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } })
-import { summarize, comparison, yearOverYear, guideBusiness, csvCell } from './metrics.ts'
+import { annualView, csvCell } from './metrics.ts'
 import type { Month } from './metrics.ts'
 
 async function paged(sb: any, table: string, select: string, storeId: number, dateColumn: string, start: string, end: string) {
@@ -63,17 +63,8 @@ Deno.serve(async request => {
     }
     const { data, error } = await sb.rpc('management_financial_months', { p_store_id: storeId, p_from: start, p_to: end })
     if (error) throw error
-    const months = (data || []) as Month[], years = []
-    for (let y = year - span + 1; y <= year; y++) {
-      const yearMonths = months.filter(item => monthKey(item.month).startsWith(String(y)))
-      const summary = summarize(yearMonths)
-      years.push({ year: y, ...summary, has_data: Boolean(summary.order_count || summary.expense_count || summary.closed_days || summary.labor) })
-    }
-    const selectedMonths = months.filter(item => monthKey(item.month).startsWith(String(year)))
-    const selected = summarize(selectedMonths)
-    const yoy = yearOverYear(months, year, localToday)
-    const comparisons = Array.from({ length: 12 }, (_, index) => comparison(months, year, index + 1))
-    return json({ store_id: storeId, year, span, comparisons, can_edit: ['owner','admin','manager'].includes(member.role), basis: 'tax_inclusive_management_estimate', months: selectedMonths.map(row => ({ ...row, estimated_profit: n(row.sales)-n(row.estimated_cogs)-n(row.labor)-n(row.expenses)-n(row.waste)-n(row.staff_consumption)-n(row.channel_fees) })), years, selected, guidance: guideBusiness(months, year, localToday), yoy_sales_percent: yoy.percent, yoy_completed_months: yoy.months,
+    const report = annualView((data || []) as Month[], year, span, localToday)
+    return json({ store_id: storeId, year, span, ...report, can_edit: ['owner','admin','manager'].includes(member.role), basis: 'tax_inclusive_management_estimate',
       notes: ['売上は会計済み注文の税込総額です。','商品原価と販売手数料は現在の登録値による概算で、購入・棚卸・過去の条件変更を反映しません。','仕入、廃棄、賄いの二重計上や未入力経費の確認が必要です。','正式な損益計算書や税務申告書ではありません。'] })
   } catch (error) { console.error(error); return json({ error: '財務データを取得できませんでした' }, 500) }
 })
