@@ -58,6 +58,42 @@
     box.append(element('p', 'muted small', decision.note))
     const action = element('a', '', '日別売上で確認する →'); action.href = link('/sales-report.html', `${data.year}-${String(decision.month).padStart(2, '0')}`); box.append(action)
   }
+  function renderPatterns(data) {
+    const parent = $('patterns'); parent.replaceChildren()
+    const rows = data.rows || [], dayLabels = ['月','火','水','木','金','土','日']
+    const rate = (value, days) => days ? Math.round(Number(value || 0) / days) : null
+    const collect = (dimension, bucket) => {
+      const group = rows.filter(row => row.dimension === dimension && Number(row.bucket) === bucket)
+      const days = Number(group[0]?.recorded_days || 0)
+      return { days, lunch: rate(group.find(row => row.slot === 'lunch')?.visit_count, days), dinner: rate(group.find(row => row.slot === 'dinner')?.visit_count, days),
+        visits: rate(group.reduce((sum, row) => sum + Number(row.visit_count || 0), 0), days), sales: rate(group.reduce((sum, row) => sum + Number(row.sales || 0), 0), days) }
+    }
+    const periods = [['weekday', dayLabels], ['month_part', ['月初（1〜10日）','中旬（11〜20日）','月末（21日以降）']]]
+    if (data.from >= data.to_exclusive) { parent.append(element('p', 'muted', 'この年は完了した月がまだありません。')); return }
+    parent.append(element('p', 'muted', `${data.from}〜${data.to_exclusive}の前日までを集計。来店組数と売上は記録のある日あたりの平均です。`))
+    for (const [dimension, labels] of periods) {
+      parent.append(element('h3', '', dimension === 'weekday' ? '曜日ごと' : '月初・中旬・月末'))
+      const wrap = element('div', 'tablewrap'), table = element('table'), head = element('thead'), body = element('tbody'), tr = element('tr')
+      for (const label of ['区分','記録日数','昼の来店','夜の来店','来店合計','売上']) tr.append(element('th', '', label))
+      head.append(tr)
+      const group = labels.map((label, index) => ({ label, ...collect(dimension, index + 1) }))
+      for (const item of group) {
+        const row = element('tr')
+        for (const value of [item.label, `${item.days}日`, item.lunch === null ? '—' : `${item.lunch}組/日`, item.dinner === null ? '—' : `${item.dinner}組/日`, item.visits === null ? '—' : `${item.visits}組/日`, item.sales === null ? '—' : `${yen(item.sales)}/日`]) row.append(element('td', '', value))
+        body.append(row)
+      }
+      table.append(head, body); wrap.append(table); parent.append(wrap)
+      const reliable = group.filter(item => item.days >= 4)
+      if (reliable.length >= 2) {
+        const high = reliable.reduce((a, b) => a.visits > b.visits ? a : b), low = reliable.reduce((a, b) => a.visits < b.visits ? a : b)
+        if (high.visits > low.visits * 1.2) parent.append(element('p', 'insight', `${high.label}は${low.label}より1日あたりの来店組数が多い傾向です。少ない区分の営業時間・客層を確認し、告知やサービス券を試す対象を絞れます。`))
+        if (dimension === 'weekday') for (const [slot, label] of [['lunch','昼'],['dinner','夜']]) {
+          const busiest = reliable.reduce((a, b) => a[slot] > b[slot] ? a : b), quietest = reliable.reduce((a, b) => a[slot] < b[slot] ? a : b)
+          if (busiest[slot] > quietest[slot] * 1.2) parent.append(element('p', 'muted', `${label}は${busiest.label}曜日が多く、${quietest.label}曜日が少ない傾向です。施策を試すなら少ない時間帯に絞り、値引き後の粗利を確認してください。`))
+        }
+      }
+    }
+  }
   function renderInsights(data) {
     const parent = $('insights'), x = data.selected, notes = []
     if (!hasData(x)) notes.push('この年はまだ記録がありません。売上と経費を入力すると、変化の理由を確認できます。')
@@ -159,6 +195,13 @@
       if (response.status === 401) { location.replace('/login.html?next=' + encodeURIComponent(location.pathname + location.search)); return }
       if (!response.ok) throw Error(data.error || '集計に失敗しました')
       render(data)
+      $('patterns').textContent = '曜日・月内の動きを集計中…'
+      try {
+        const patternResponse = await fetch(endpoint({ mode: 'patterns' }), { headers: { Authorization: 'Bearer ' + token } })
+        const patternData = await patternResponse.json().catch(() => ({}))
+        if (!patternResponse.ok) throw Error(patternData.error || '曜日・月内の集計に失敗しました')
+        if ($('store').value === String(data.store_id) && $('year').value === String(data.year)) renderPatterns(patternData)
+      } catch (patternError) { $('patterns').textContent = patternError.message }
       $('status').textContent = '更新 ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
       const url = new URL(location.href); url.searchParams.set('store_id', $('store').value); url.searchParams.set('year', $('year').value); url.searchParams.set('span', span); history.replaceState(null, '', url)
     } catch (error) { $('status').className = 'muted error'; $('status').textContent = error.message }

@@ -20,10 +20,11 @@
   <h1>経営分析</h1><p class="muted lede">売上の動きと費用の変化を、店舗ごとに見られます。</p>
   <section class="card" aria-label="表示条件"><div class="controls"><label>店舗<select id="store"><option value="1">151 長浜店</option><option value="2">151 白木原店</option></select></label><label>対象年<input id="year" type="number" min="2000" max="2100"></label><button id="go" class="primary" type="button">表示する</button></div><div class="range" role="group" aria-label="表示期間"><button type="button" data-span="1" aria-pressed="false">この1年</button><button type="button" data-span="5" aria-pressed="true">過去5年</button><button type="button" data-span="10" aria-pressed="false">過去10年</button></div><p id="status" class="muted" role="status" aria-live="polite"></p></section>
   <div id="content" hidden>
-    <nav class="jumplinks" aria-label="画面内の項目"><a href="#summary">概要</a><a href="#trend">売上の推移</a><a href="#comparison-section">同じ月を比較</a><a href="#costs">費用と利益</a><a href="#checks">記録の確認</a></nav>
+    <nav class="jumplinks" aria-label="画面内の項目"><a href="#summary">概要</a><a href="#patterns-section">曜日・月内の傾向</a><a href="#trend">売上の推移</a><a href="#comparison-section">同じ月を比較</a><a href="#costs">費用と利益</a><a href="#checks">記録の確認</a></nav>
     <section id="summary" class="card hero"><h2 id="headline"></h2><div id="sales" class="amount"></div><div class="muted">会計済みの売上（税込）</div><div id="summary-pills" class="pills"></div></section>
     <section id="no-data" class="card no-data" hidden><h2>この期間はまだ記録がありません</h2><p>売上や経費が登録されると、比較や損益の数字がここに表示されます。</p><a id="no-data-daily" href="/sales-report.html">日別の売上を確認する →</a></section>
     <section id="current-month-section" class="card" hidden><h2 id="current-month-heading">今月の打ち手を考える</h2><div id="current-month-decision"></div></section>
+    <section id="patterns-section" class="card"><h2>曜日・時間帯、月初から月末の動き</h2><p class="muted">選択した店舗・年の完了した月を集計します。店舗の時刻で昼11〜15時、夜17〜翌3時、それ以外に分けます。</p><div id="patterns" role="status" aria-live="polite">読み込み中…</div><p class="muted small">「記録のある日あたり」は、会計済み注文または日次締めがある日で割っています。締め漏れや休業日があると実際の営業日平均と異なります。キャンペーン前には曜日ごとの営業日数、天候、祝日も確認してください。</p></section>
     <section class="card"><h2>まず見る数字</h2><div id="metrics" class="stats"></div></section>
     <section class="card"><h2>今、確認すること</h2><div id="guidance"></div></section>
     <section class="card"><h2>数字からわかること</h2><div id="insights"></div><div class="actions"><a id="insight-daily" href="/sales-report.html">日別売上を見る →</a><a href="#comparison-section">同じ月を比べる →</a></div></section>
