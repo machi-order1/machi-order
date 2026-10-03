@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization,content-type,apikey', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' } })
-import { annualView, csvCell } from './metrics.ts'
+import { annualView, csvCell, menuDateRange } from './metrics.ts'
 import type { Month } from './metrics.ts'
 
 async function paged(sb: any, table: string, select: string, storeId: number, dateColumn: string, start: string, end: string) {
@@ -34,6 +34,19 @@ Deno.serve(async request => {
     const { data: member, error: memberError } = await sb.from('store_memberships').select('role').eq('user_id', user.id).eq('store_id', storeId).eq('active', true).maybeSingle()
     if (memberError) throw memberError
     if (!member || !['owner', 'admin', 'manager', 'viewer'].includes(member.role)) return json({ error: '閲覧権限がありません' }, 403)
+    if (request.method === 'GET' && query.get('mode') === 'menu') {
+      const range = query.get('range') || 'today', requestedDate = query.get('date') || localToday
+      const idText = query.get('product_id') || ''
+      if (!['today','this_week','last_week','this_month','last_month','this_year','last_year','date'].includes(range)
+        || (idText && (!/^[1-9]\d*$/.test(idText) || !Number.isSafeInteger(Number(idText))))
+        || !/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)
+        || Number.isNaN(Date.parse(`${requestedDate}T00:00:00Z`))
+        || new Date(`${requestedDate}T00:00:00Z`).toISOString().slice(0, 10) !== requestedDate) return json({ error: '期間・商品を確認してください' }, 400)
+      const { from, to } = menuDateRange(localToday, range, requestedDate)
+      const { data, error } = await sb.rpc('management_menu_sales', { p_store_id: storeId, p_from: from, p_to: to, p_product_id: idText ? Number(idText) : null })
+      if (error) throw error
+      return json({ store_id: storeId, range, from, to_exclusive: to, ...data, basis: 'item_line_before_order_discount' })
+    }
     if (request.method === 'POST') {
       if (!['owner', 'admin', 'manager'].includes(member.role)) return json({ error: '経費を記録する権限がありません' }, 403)
       const body = await request.json().catch(() => ({}))
