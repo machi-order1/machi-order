@@ -25,6 +25,8 @@ jobs:
         run: node --check machi-app.js && node --check machi-ui-config.js && node --check financial-analysis.js && node --check receipt-capture.js && node --check invoice-management.js && node --check sw.js
       - name: Audit store routing
         run: node scripts/audit-store-routing.mjs
+      - name: Verify Cloudflare Pages bundle
+        run: node scripts/build-cloudflare-pages.mjs
       - name: Check financial report calculations
         run: node --experimental-strip-types scripts/test-financial-report.mjs
       - name: Check receipt and invoice OCR suggestions
