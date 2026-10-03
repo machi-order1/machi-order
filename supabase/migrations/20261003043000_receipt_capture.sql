@@ -31,6 +31,7 @@ begin
     if v_expense_id is null then raise exception 'receipt_confirmation_incomplete'; end if;
     return v_expense_id;
   end if;
+  if v_receipt.extraction_status not in ('needs_review','pending','failed') then raise exception 'receipt_already_resolved'; end if;
   if v_receipt.image_path is null then raise exception 'receipt_image_missing'; end if;
   if coalesce(v_receipt.extracted_data->>'inventory_warning','false')='true' then
     raise exception 'inventory_purchase_requires_review';
@@ -72,21 +73,29 @@ create table if not exists public.expense_month_closings (
   receipt_count integer not null,
   closed_at timestamptz not null default now(),
   closed_by uuid not null,
-  unique(store_id,month),
+  reopened_at timestamptz,
+  reopened_by uuid,
+  reopen_reason text,
   check (extract(day from month)=1)
 );
+create unique index if not exists expense_month_closings_active_idx
+  on public.expense_month_closings(store_id,month) where reopened_at is null;
 alter table public.expense_month_closings enable row level security;
 revoke all on public.expense_month_closings from anon,authenticated;
 
 create or replace function public.guard_closed_expense_month() returns trigger
 language plpgsql security invoker set search_path='public','pg_temp' as $guard$
+declare v_store bigint; v_date date;
 begin
+  v_store := case when tg_op='DELETE' then old.store_id else new.store_id end;
+  v_date := case when tg_op='DELETE' then old.expense_date else new.expense_date end;
+  perform pg_advisory_xact_lock(hashtext(v_store::text),extract(year from v_date)::integer*100+extract(month from v_date)::integer);
   if exists (select 1 from public.expense_month_closings
-    where store_id=case when tg_op='DELETE' then old.store_id else new.store_id end
+    where reopened_at is null and store_id=case when tg_op='DELETE' then old.store_id else new.store_id end
     and month=date_trunc('month',case when tg_op='DELETE' then old.expense_date else new.expense_date end)::date)
     then raise exception 'expense_month_closed'; end if;
   if tg_op='UPDATE' and old.expense_date is distinct from new.expense_date and exists (
-    select 1 from public.expense_month_closings where store_id=old.store_id
+    select 1 from public.expense_month_closings where reopened_at is null and store_id=old.store_id
     and month=date_trunc('month',old.expense_date)::date)
     then raise exception 'expense_month_closed'; end if;
   if tg_op='DELETE' then return old; end if;
@@ -102,8 +111,8 @@ declare v_id bigint; v_total numeric; v_count integer; v_receipts integer; v_end
 begin
   if p_month is null or extract(day from p_month)<>1 or p_month>=date_trunc('month',now() at time zone 'Asia/Tokyo')::date
     then raise exception 'month_not_finished'; end if;
-  perform pg_advisory_xact_lock(p_store_id,extract(year from p_month)::integer*100+extract(month from p_month)::integer);
-  select id into v_id from public.expense_month_closings where store_id=p_store_id and month=p_month;
+  perform pg_advisory_xact_lock(hashtext(p_store_id::text),extract(year from p_month)::integer*100+extract(month from p_month)::integer);
+  select id into v_id from public.expense_month_closings where store_id=p_store_id and month=p_month and reopened_at is null;
   if v_id is not null then return v_id; end if;
   v_end := (p_month + interval '1 month')::date;
   if exists(select 1 from public.receipt_imports where store_id=p_store_id
@@ -128,6 +137,47 @@ begin
 end $close$;
 revoke all on function public.close_expense_month(bigint,date,uuid) from public,anon,authenticated;
 grant execute on function public.close_expense_month(bigint,date,uuid) to service_role;
+
+-- A mistaken close can be reopened with an explicit audit trail, then closed again.
+create or replace function public.reopen_expense_month(p_store_id bigint,p_month date,p_user_id uuid,p_reason text)
+returns bigint language plpgsql security invoker set search_path='public','pg_temp' as $reopen$
+declare v public.expense_month_closings%rowtype;
+begin
+  if p_month is null or extract(day from p_month)<>1 or length(trim(coalesce(p_reason,'')))<5
+    or length(p_reason)>500 then raise exception 'invalid_reopen_reason'; end if;
+  perform pg_advisory_xact_lock(hashtext(p_store_id::text),extract(year from p_month)::integer*100+extract(month from p_month)::integer);
+  select * into v from public.expense_month_closings where store_id=p_store_id and month=p_month
+    and reopened_at is null for update;
+  if not found then raise exception 'month_not_closed'; end if;
+  update public.expense_month_closings set reopened_at=now(),reopened_by=p_user_id,
+    reopen_reason=trim(p_reason) where id=v.id;
+  insert into public.audit_logs(store_id,user_id,action,entity_type,entity_id,details)
+    values(p_store_id,p_user_id,'expense_month_reopened','expense_month_closing',v.id::text,
+      jsonb_build_object('month',p_month,'reason',trim(p_reason),'previous_total',v.expense_total,'previous_count',v.expense_count));
+  return v.id;
+end $reopen$;
+revoke all on function public.reopen_expense_month(bigint,date,uuid,text) from public,anon,authenticated;
+grant execute on function public.reopen_expense_month(bigint,date,uuid,text) to service_role;
+
+-- Review resolution and its audit entry commit together.
+create or replace function public.resolve_receipt_import(p_store_id bigint,p_receipt_id bigint,p_user_id uuid,p_reason text,p_note text)
+returns bigint language plpgsql security invoker set search_path='public','pg_temp' as $resolve$
+declare v public.receipt_imports%rowtype;
+begin
+  select * into v from public.receipt_imports where store_id=p_store_id and id=p_receipt_id for update;
+  if not found then raise exception 'receipt_not_found'; end if;
+  if v.extraction_status not in ('needs_review','pending','failed') or v.confirmed then raise exception 'receipt_already_resolved'; end if;
+  if p_reason not in ('inventory','personal','duplicate','other') or length(trim(coalesce(p_note,'')))<3
+    or length(p_note)>500 then raise exception 'invalid_resolution'; end if;
+  update public.receipt_imports set extraction_status='resolved_'||p_reason,review_note=trim(p_note),
+    confirmed_by=p_user_id,confirmed_at=now() where id=p_receipt_id;
+  insert into public.audit_logs(store_id,user_id,action,entity_type,entity_id,details)
+    values(p_store_id,p_user_id,'receipt_resolved','receipt_import',p_receipt_id::text,
+      jsonb_build_object('reason',p_reason,'note',trim(p_note)));
+  return p_receipt_id;
+end $resolve$;
+revoke all on function public.resolve_receipt_import(bigint,bigint,uuid,text,text) from public,anon,authenticated;
+grant execute on function public.resolve_receipt_import(bigint,bigint,uuid,text,text) to service_role;
 
 -- Aggregate without the API's default 1000-row response limit.
 create or replace function public.expense_month_overview(p_store_id bigint,p_month date)
