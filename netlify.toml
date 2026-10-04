@@ -1,5 +1,6 @@
 [build]
-  publish = "."
+  command = "node scripts/build-cloudflare-pages.mjs"
+  publish = ".cloudflare-pages-dist"
 
 [[headers]]
   for = "/*"
