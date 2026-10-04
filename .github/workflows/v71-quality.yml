@@ -45,6 +45,8 @@ jobs:
         run: node scripts/test-monthly-review.cjs && node --check monthly-review.js
       - name: Check expense duplicate candidates
         run: node scripts/test-expense-duplicates.mjs && node --experimental-strip-types --check supabase/functions/expense-duplicates-api/index.ts
+      - name: Check campaign log syntax
+        run: node --check campaign-log.js && node --experimental-strip-types --check supabase/functions/campaign-api/index.ts
       - name: Check receipt and invoice OCR suggestions
         run: node --experimental-strip-types scripts/test-receipt-parser.mjs && node --experimental-strip-types scripts/test-invoice-parser.mjs
       - name: Run V71 regression checks
