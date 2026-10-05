@@ -64,6 +64,7 @@ Deno.serve(async (req: Request) => {
         if (auditError) console.error('audit_log_failed', auditError)
         return json(data || { ok: true })
       }
+      if (action !== 'complete_payment') return json({ error: '会計操作が正しくありません' }, 400)
       const method = String(body.payment_method || '')
       if (!['cash', 'paypay', 'other'].includes(method)) return json({ error: '支払方法が正しくありません' }, 400)
       const { data, error } = await sb.rpc('complete_order_payment', { p_store_id: storeId, p_order_id: orderId, p_method: method, p_user_id: user.id })
@@ -71,6 +72,8 @@ Deno.serve(async (req: Request) => {
         if (String(error.message).includes('order_not_found')) return json({ error: '注文が見つかりません' }, 404)
         throw error
       }
+      // A replay must not record another payment or suggest undoing someone else's payment.
+      if (data?.already_paid) return json(data)
       const { error: auditError } = await sb.from('audit_logs').insert({
         store_id: storeId,
         user_id: user.id,

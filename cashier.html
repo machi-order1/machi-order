@@ -27,7 +27,7 @@
   <nav class="mo-appnav"><a href="/store-command.html"><b>⌂</b>ホーム</a><a href="/kitchen.html"><b>🍳</b>厨房</a><a href="/today.html"><b>✓</b>今日</a><a class="active" href="/cashier.html"><b>¥</b>会計</a><a href="/staff.html"><b>☰</b>その他</a></nav>
   <script>
     const API='https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/cashier-api?store_id=1',AUTH='https://tejglrlkaqolbghoagqj.supabase.co/auth/v1/token',KEY='sb_publishable_beZla85Y6Ngrx0hji9I9rg_FbcRSUoT';
-    let busy=new Set(),orders=[],toastTimer,currentMode='pending',toastCallback=null;
+    let busy=new Set(),orders=[],toastTimer,currentMode='pending',toastCallback=null,loadGeneration=0,loadedMode=null;
     const app=document.getElementById('app'),statusNode=document.getElementById('status'),toast=document.getElementById('toast'),toastMessage=document.getElementById('toast-message'),toastAction=document.getElementById('toast-action'),historyTools=document.getElementById('history-tools'),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),yen=n=>'¥'+Number(n||0).toLocaleString('ja-JP');
     function showToast(message,action=null){toastMessage.textContent=message;toastCallback=action;toastAction.hidden=!action;toastAction.disabled=false;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast.classList.remove('show');toastCallback=null},action?10000:4200)}
     function rawToken(){return localStorage.getItem('machi_access_token')||localStorage.getItem('mo_staff_token')||localStorage.getItem('access_token')||localStorage.getItem('sb_access_token')||''}
@@ -45,6 +45,7 @@
     function withinUndo(order){return order.paid_at&&Date.now()-new Date(order.paid_at).getTime()<=5*60_000}
     function visibleHistory(){const query=document.getElementById('history-search').value.trim().toLowerCase(),method=document.getElementById('payment-filter').value;return orders.filter(order=>{const info=takeoutInfo(order),haystack=[order.id,order.receipt_number,order.dining_tables?.name,info?.customer_name,info?.phone].join(' ').toLowerCase();return(!query||haystack.includes(query))&&(!method||order.payment_method===method)})}
     function render(){
+      if(loadedMode!==currentMode)return;
       historyTools.classList.toggle('show',currentMode==='history');
       const list=currentMode==='history'?visibleHistory():orders;
       const total=list.reduce((sum,order)=>sum+Number(order.total||0),0);
@@ -54,12 +55,30 @@
       document.querySelectorAll('.pay button').forEach(button=>button.addEventListener('click',()=>pay(Number(button.dataset.id),button.dataset.method)));
       document.querySelectorAll('[data-undo]').forEach(button=>button.addEventListener('click',()=>undoPayment(Number(button.dataset.undo))));
     }
-    async function load(){const t=await token();if(!t){statusNode.textContent='未ログイン';app.innerHTML='<div class="empty"><b>ログインが必要です</b>長浜店のスタッフアカウントでログインしてください。<br><a href="/login.html?next=/cashier.html">ログイン画面を開く</a></div>';return}try{const r=await fetch(API+'&mode='+currentMode,{headers:{Authorization:'Bearer '+t}}),j=await r.json();if(r.status===401){clearSession();location.replace('/login.html?next=/cashier.html');return}if(!r.ok)throw Error(j.error||'会計情報を取得できません');orders=j.orders||[];render()}catch(e){statusNode.textContent='再接続中';if(!orders.length)app.innerHTML='<div class="empty"><b>会計情報を取得できません</b>'+esc(e.message)+'<br>自動で再接続します</div>'}}
+    async function load(){
+      const generation=++loadGeneration,mode=currentMode;
+      const t=await token();
+      if(generation!==loadGeneration||mode!==currentMode)return;
+      if(!t){loadedMode=null;statusNode.textContent='未ログイン';app.innerHTML='<div class="empty"><b>ログインが必要です</b>スタッフアカウントでログインしてください。<br><a href="/login.html?next=/cashier.html">ログイン画面を開く</a></div>';return}
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+      try{
+        const r=await fetch(API+'&mode='+mode,{headers:{Authorization:'Bearer '+t},signal:controller.signal}),j=await r.json();
+        if(generation!==loadGeneration||mode!==currentMode)return;
+        if(r.status===401){clearSession();location.replace('/login.html?next=/cashier.html');return}
+        if(!r.ok)throw Error(j.error||'会計情報を取得できません');
+        if(!Array.isArray(j.orders))throw Error('会計情報の形式を確認できません');
+        orders=j.orders;loadedMode=mode;render();
+      }catch(e){
+        if(generation!==loadGeneration||mode!==currentMode)return;
+        loadedMode=null;statusNode.textContent='再接続中';
+        app.innerHTML='<div class="empty"><b>会計情報を取得できません</b>通信を確認しています。自動で再接続します</div>';
+      }finally{clearTimeout(timer)}
+    }
     async function apiPost(body){const r=await fetch(API,{method:'POST',headers:{Authorization:'Bearer '+await token(),'Content-Type':'application/json'},body:JSON.stringify(body)}),j=await r.json().catch(()=>({}));if(r.status===401){clearSession();location.replace('/login.html?next=/cashier.html');throw Error('ログインしてください')}if(!r.ok)throw Error(j.error||'会計を更新できません');return j}
-    async function pay(id,method){if(busy.has(id))return;const order=orders.find(o=>Number(o.id)===id),amount=yen(order?.total),seat=order?displaySeat(order):'注文 #'+id;const question=method==='cash'?`${seat}：お客様から ${amount} を受け取りましたか？\n\nOK後は会計完了になります。`:`${seat}：PayPay側で ${amount} の入金を確認しましたか？\n\n支払い画面だけでなく、入金済みを確認してからOKを押してください。`;if(!confirm(question))return;busy.add(id);render();try{await apiPost({action:'complete_payment',order_id:id,payment_method:method});showToast(`${seat} ${amount}｜${paymentLabel(method)}会計を完了しました`,()=>undoPayment(id,{seat,amount,method}));await load()}catch(e){alert(e.message);await load()}finally{busy.delete(id);render()}}
-    async function undoPayment(id,known=null){if(busy.has(id))return;const order=known||orders.find(o=>Number(o.id)===id)||{},seat=known?.seat||displaySeat(order)||'注文 #'+id,amount=known?.amount||yen(order.total),method=known?.method||order.payment_method;const note=method==='paypay'?'\n\n重要：PayPayの返金は自動では行われません。これはMACHI ORDER上の会計表示だけを未会計へ戻します。':'\n\n現金の受け渡しは別途確認してください。';if(!confirm(`${seat} ${amount} の会計完了を取り消しますか？${note}`))return;busy.add(id);render();try{const result=await apiPost({action:'undo_payment',order_id:id});toast.classList.remove('show');showToast(result.external_refund_required?'未会計へ戻しました。PayPay返金は別途必要です':'未会計へ戻しました');currentMode='pending';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.mode==='pending'));await load()}catch(e){alert(e.message);await load()}finally{busy.delete(id);render()}}
+    async function pay(id,method){if(busy.has(id)||loadedMode!=='pending'||currentMode!=='pending')return;const order=orders.find(o=>Number(o.id)===id);if(!order)return;const amount=yen(order?.total),seat=order?displaySeat(order):'注文 #'+id;const question=method==='cash'?`${seat}：お客様から ${amount} を受け取りましたか？\n\nOK後は会計完了になります。`:`${seat}：PayPay側で ${amount} の入金を確認しましたか？\n\n支払い画面だけでなく、入金済みを確認してからOKを押してください。`;if(!confirm(question))return;busy.add(id);render();try{const result=await apiPost({action:'complete_payment',order_id:id,payment_method:method});if(result.already_paid){showToast(`${seat} ${yen(result.total)}｜すでに${paymentLabel(result.payment_method)}で会計済みです`)}else showToast(`${seat} ${amount}｜${paymentLabel(method)}会計を完了しました`,()=>undoPayment(id,{seat,amount,method}));await load()}catch(e){alert(e.message);await load()}finally{busy.delete(id);if(loadedMode===currentMode)render()}}
+    async function undoPayment(id,known=null){if(busy.has(id))return;if(!known&&(loadedMode!=='history'||currentMode!=='history'))return;const order=known||orders.find(o=>Number(o.id)===id);if(!order)return;const seat=known?.seat||displaySeat(order)||'注文 #'+id,amount=known?.amount||yen(order.total),method=known?.method||order.payment_method;const note=method==='paypay'?'\n\n重要：PayPayの返金は自動では行われません。これはMACHI ORDER上の会計表示だけを未会計へ戻します。':'\n\n現金の受け渡しは別途確認してください。';if(!confirm(`${seat} ${amount} の会計完了を取り消しますか？${note}`))return;busy.add(id);render();try{const result=await apiPost({action:'undo_payment',order_id:id});toast.classList.remove('show');showToast(result.external_refund_required?'未会計へ戻しました。PayPay返金は別途必要です':'未会計へ戻しました');currentMode='pending';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.mode==='pending'));await load()}catch(e){alert(e.message);await load()}finally{busy.delete(id);if(loadedMode===currentMode)render()}}
     toastAction.addEventListener('click',async()=>{if(!toastCallback)return;const action=toastCallback;toastCallback=null;toastAction.disabled=true;await action()});
-    document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{currentMode=button.dataset.mode;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===button));orders=[];app.innerHTML='<div class="empty"><b>読み込み中</b>少しお待ちください</div>';load()}));
+    document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{currentMode=button.dataset.mode;loadedMode=null;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===button));orders=[];app.innerHTML='<div class="empty"><b>読み込み中</b>少しお待ちください</div>';load()}));
     document.getElementById('history-search').addEventListener('input',render);document.getElementById('payment-filter').addEventListener('change',render);
     document.getElementById('logout-button').addEventListener('click',()=>{if(confirm('この端末からログアウトしますか？')){clearSession();location.replace('/login.html?next=/cashier.html')}});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});load();setInterval(()=>{if(document.visibilityState==='visible')load()},7000);if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
