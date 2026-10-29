@@ -8,6 +8,12 @@
     document.querySelector('.mo-appnav a.active').href = '/kitchen.html?store=shirakibaru';
     const cashierLink = document.querySelector('.mo-appnav a[href="/cashier.html"]');
     if (cashierLink) cashierLink.href = '/cashier.html?store=shirakibaru';
+    const homeLink = document.querySelector('.mo-appnav a[href="/store-command.html"]');
+    if (homeLink) { homeLink.href = '/kitchen-apps.html'; homeLink.textContent = '店舗選択'; }
+    for (const href of ['/today.html', '/staff.html']) {
+      const link = document.querySelector(`.mo-appnav a[href="${href}"]`);
+      if (link) link.hidden = true; // These pages are currently Nagahama-specific.
+    }
     const test = document.querySelector('.test-actions a[href="/takeout.html"]');
     if (test) test.remove(); // Do not send a Shirakibaru test to Nagahama.
   }
