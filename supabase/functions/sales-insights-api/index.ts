@@ -12,6 +12,14 @@ const firstMonth = (day: string, monthsBack: number) => {
   d.setUTCMonth(d.getUTCMonth() - monthsBack)
   return d.toISOString().slice(0, 10)
 }
+const previousDay = (day: string) => {
+  const d = new Date(day + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+const validDay = (day: string) => /^\d{4}-\d{2}-\d{2}$/.test(day)
+  && !Number.isNaN(Date.parse(day + 'T00:00:00Z'))
+  && new Date(day + 'T00:00:00Z').toISOString().slice(0, 10) === day
 
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response(null, { headers })
@@ -25,7 +33,7 @@ Deno.serve(async request => {
     const query = new URL(request.url).searchParams
     const storeId = Number(query.get('store_id'))
     const range = query.get('range') || 'three_months'
-    if (!Number.isInteger(storeId) || storeId < 1 || !['three_months','six_months','year','all'].includes(range)) return json({ error: '店舗と期間を確認してください' }, 400)
+    if (!Number.isInteger(storeId) || storeId < 1 || !['today','yesterday','this_week','date','month','three_months_ago','three_months','six_months','year','all'].includes(range)) return json({ error: '店舗と期間を確認してください' }, 400)
     const sb = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const { data: member, error: memberError } = await sb.from('store_memberships').select('role').eq('store_id', storeId).eq('user_id', user.id).eq('active', true).maybeSingle()
     if (memberError) throw memberError
@@ -37,9 +45,28 @@ Deno.serve(async request => {
       .eq('store_id', storeId).eq('payment_status', 'paid').neq('status', 'cancelled')
       .lte('business_date', today).order('business_date', { ascending: true }).limit(1).maybeSingle()
     if (firstError) throw firstError
-    const monthsBack = range === 'three_months' ? 2 : range === 'six_months' ? 5 : 11
-    const start = range === 'all' ? (first?.business_date || today) : firstMonth(today, monthsBack)
-    const end = nextDay(today)
+    const selectedDay = query.get('date') || ''
+    const selectedMonth = query.get('month') || ''
+    if (range === 'date' && (!validDay(selectedDay) || selectedDay > today)) return json({ error: '営業日を確認してください' }, 400)
+    if (range === 'month' && (!/^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth) || selectedMonth > today.slice(0, 7))) return json({ error: '月を確認してください' }, 400)
+    const offset = (new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7
+    let start = today, end = nextDay(today)
+    if (range === 'yesterday') { start = previousDay(today); end = today }
+    if (range === 'this_week') {
+      const monday = new Date(today + 'T12:00:00Z')
+      monday.setUTCDate(monday.getUTCDate() - offset)
+      start = monday.toISOString().slice(0, 10)
+    }
+    if (range === 'date') { start = selectedDay; end = nextDay(selectedDay) }
+    if (range === 'month') {
+      start = selectedMonth + '-01'
+      end = selectedMonth === today.slice(0, 7) ? nextDay(today) : firstMonth(start, -1)
+    }
+    if (range === 'three_months_ago') { start = firstMonth(today, 3); end = firstMonth(today, 2) }
+    if (range === 'three_months') start = firstMonth(today, 2)
+    if (range === 'six_months') start = firstMonth(today, 5)
+    if (range === 'year') start = firstMonth(today, 11)
+    if (range === 'all') start = first?.business_date || today
     const { data, error } = await sb.rpc('management_sales_mix', { p_store_id: storeId, p_from: start, p_to: end })
     if (error) throw error
     return json({ store_id: storeId, store_name: store.name, range, from: start, to_exclusive: end,
