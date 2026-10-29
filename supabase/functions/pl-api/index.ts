@@ -7,7 +7,7 @@ const headers = {
   'Content-Type': 'application/json; charset=utf-8',
 }
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers })
-type Sale = { payment_status: string; id: number; total: number; business_date: string; check_group_id: number | null; guest_count: number; payment_method: string | null; order_channel_code: string | null; order_items?: { quantity: number; product_id: number }[] }
+type Sale = { payment_status: string; id: number; total: number; business_date: string; business_period_id: number | null; check_group_id: number | null; guest_count: number; payment_method: string | null; order_channel_code: string | null; order_items?: { quantity: number; product_id: number }[] }
 type Fee = { channel_code: string; percent_fee: number; fixed_fee: number }
 
 function summarizeSales(paid: Sale[], feeRules: Fee[]) {
@@ -72,19 +72,24 @@ Deno.serve(async (request: Request) => {
     const timezone = store?.timezone || 'Asia/Tokyo'
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
     const day = params.get('date')
+    const week = params.get('week')
     const month = params.get('month') || today.slice(0, 7)
-    if (day && (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`)) || new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day)) return response({ error: '日付を確認してください' }, 400)
+    if (day && week) return response({ error: '期間を一つ選んでください' }, 400)
+    for (const value of [day, week]) if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`)) || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value)) return response({ error: '日付を確認してください' }, 400)
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return response({ error: '月を確認してください' }, 400)
-    const start = day || `${month}-01`
+    const selectedWeek = week ? new Date(`${week}T12:00:00Z`) : null
+    if (selectedWeek) selectedWeek.setUTCDate(selectedWeek.getUTCDate() - (selectedWeek.getUTCDay() + 6) % 7)
+    const start = day || (selectedWeek ? selectedWeek.toISOString().slice(0, 10) : `${month}-01`)
     const next = new Date(`${start}T12:00:00Z`)
     if (day) next.setUTCDate(next.getUTCDate() + 1)
+    else if (week) next.setUTCDate(next.getUTCDate() + 7)
     else next.setUTCMonth(next.getUTCMonth() + 1)
     const end = next.toISOString().slice(0, 10)
     const orders: Sale[] = []
     // The API has a per-request row limit; read every page to avoid a partial month.
     for (let offset = 0; ; offset += 1000) {
       const { data, error } = await sb.from('orders')
-        .select('id,total,payment_status,order_channel_code,guest_count,check_group_id,business_date,payment_method,order_items(quantity,product_id)')
+        .select('id,total,payment_status,order_channel_code,guest_count,check_group_id,business_date,business_period_id,payment_method,order_items(quantity,product_id)')
         .eq('store_id', storeId).gte('business_date', start).lt('business_date', end)
         .neq('status', 'cancelled').order('id', { ascending: true }).range(offset, offset + 999)
       if (error) throw error
@@ -93,6 +98,18 @@ Deno.serve(async (request: Request) => {
       if (offset > 99000) throw Error('注文件数の上限を超えました')
     }
     const paid = orders.filter(order => order.payment_status === 'paid')
+    const { data: periods, error: periodError } = await sb.from('business_periods').select('id,name').eq('store_id', storeId)
+    if (periodError) throw periodError
+    const periodNames = new Map((periods || []).map(period => [period.id, period.name]))
+    const slots: Record<string, { sales: number; orders: number }> = {
+      lunch: { sales: 0, orders: 0 }, dinner: { sales: 0, orders: 0 }, other: { sales: 0, orders: 0 },
+    }
+    for (const order of paid) {
+      const name = periodNames.get(order.business_period_id) || ''
+      const slot = name.includes('昼') ? 'lunch' : name.includes('夜') ? 'dinner' : 'other'
+      slots[slot].sales += Number(order.total || 0)
+      slots[slot].orders++
+    }
     const productIds = [...new Set(paid.flatMap(order => order.order_items || []).map(item => item.product_id))]
     const { data: products, error: productError } = productIds.length
       ? await sb.from('products').select('id,cost_price').in('id', productIds)
@@ -122,12 +139,12 @@ Deno.serve(async (request: Request) => {
       sb.from('staff_consumption_events').select('id', { count: 'exact', head: true }).eq('store_id', storeId).gte('business_date', start).lt('business_date', end).eq('cost_complete', false),
     ])
     const ratio = (value: number) => salesSummary.sales ? Math.round(value / salesSummary.sales * 1000) / 10 : 0
-    return response({ ...salesSummary, data_quality: {
+    return response({ ...salesSummary, slots, from: start, to_exclusive: end, data_quality: {
       active_products: activeProducts || 0, costed_products: costedProducts || 0,
       uncosted_products: Math.max(0, (activeProducts || 0) - (costedProducts || 0)),
       expense_rows: (expensesResult.data || []).length, waste_rows: (wasteResult.data || []).length,
       uncosted_staff_consumption: uncostedStaff || 0,
-    }, period: day || month, month, date: day || null,
+    }, period: day || (week ? `${start}〜${new Date(next.getTime() - 86_400_000).toISOString().slice(0, 10)}` : month), month, date: day || null, week: week ? start : null,
     cogs, gross_profit: gross, labor_cost: labor, waste_cost: waste,
     staff_consumption_cost: staffConsumption, expenses, operating_profit: operating,
     ratios: { food: ratio(cogs), labor: ratio(labor), fl: ratio(cogs + labor), operating: ratio(operating) } })
