@@ -35,6 +35,12 @@
       document.title='白木原店 会計｜MACHI ORDER';
       document.querySelector('.mo-appnav a[href="/kitchen.html"]').href='/kitchen.html?store=shirakibaru';
       document.querySelector('.mo-appnav a[href="/cashier.html"]').href='/cashier.html?store=shirakibaru';
+      const homeLink=document.querySelector('.mo-appnav a[href="/store-command.html"]');
+      if(homeLink){homeLink.href='/kitchen-apps.html';homeLink.textContent='店舗選択'}
+      for(const href of ['/today.html','/staff.html']){
+        const link=document.querySelector('.mo-appnav a[href="'+href+'"]');
+        if(link){link.hidden=true;link.style.display='none'}
+      }
     }else{
       document.querySelector('.head h1').textContent='長浜店 会計';
       document.title='長浜店 会計｜MACHI ORDER';
