@@ -6,6 +6,8 @@
   if (STORE_CODE === 'shirakibaru') {
     document.querySelector('link[rel="manifest"]').href = '/kitchen-shirakibaru.webmanifest';
     document.querySelector('.mo-appnav a.active').href = '/kitchen.html?store=shirakibaru';
+    const cashierLink = document.querySelector('.mo-appnav a[href="/cashier.html"]');
+    if (cashierLink) cashierLink.href = '/cashier.html?store=shirakibaru';
     const test = document.querySelector('.test-actions a[href="/takeout.html"]');
     if (test) test.remove(); // Do not send a Shirakibaru test to Nagahama.
   }
