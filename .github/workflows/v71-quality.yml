@@ -53,5 +53,7 @@ jobs:
         run: node --experimental-strip-types scripts/test-receipt-parser.mjs && node --experimental-strip-types scripts/test-invoice-parser.mjs
       - name: Check store operations sales
         run: node scripts/store-operations-sales-test.mjs
+      - name: Check product and set sales insights
+        run: node scripts/sales-insights-test.mjs
       - name: Run V71 regression checks
         run: node scripts/qa-v71.mjs
