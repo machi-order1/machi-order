@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>商品と売上の分析｜MACHI ORDER</title>
+<link rel="stylesheet" href="/machi-design-system.css"><script src="/machi-ui-config.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f5f7;color:#171717;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}main{max-width:850px;margin:auto;padding:20px 15px 90px}h1{font-size:26px;margin:20px 0 5px}h2{font-size:20px;margin:0 0 15px}.muted{color:#62656a;font-size:13px;line-height:1.6}.card{background:#fff;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 1px 8px #0000000a}.top{display:flex;justify-content:space-between;gap:12px;align-items:center}.top a{color:#222}.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.controls select{padding:12px;border:1px solid #ddd;border-radius:10px;font-size:16px;background:white}.ranges{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.ranges button{border:0;background:#e9eaed;border-radius:11px;padding:11px 14px;font-size:14px;font-weight:700;cursor:pointer}.ranges button[aria-pressed="true"]{background:#161616;color:#fff}.hero{font-size:39px;font-weight:850;margin:6px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stat{padding:12px;background:#f4f5f6;border-radius:11px}.stat small{display:block;color:#666}.stat b{display:block;font-size:20px;margin-top:5px}.row{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #eee;padding:10px 0}.row:last-child{border:0}.row span{min-width:0}.row b{white-space:nowrap}.empty{padding:20px;color:#666}.insight{background:#f4f8ed;border-radius:12px;padding:13px;margin:10px 0;line-height:1.6}.error{color:#a71920}.secondary{margin-top:8px}
+</style>
+</head>
+<body><main>
+<div class="top"><a href="/sales-report.html" id="back">← 日・週・月の売上</a><a href="/financial-analysis.html" id="finance">年次・経費の分析 →</a></div>
+<h1>商品と売上の分析</h1><p class="muted">店舗ごとの会計済み注文だけを集計。売上は税込み、商品別金額は値引き前の明細です。</p>
+<section class="card"><div class="controls"><label>店舗 <select id="store"><option value="1">博多油そば151 長浜店</option><option value="2">博多油そば151 白木原店</option></select></label></div>
+<div class="ranges" aria-label="分析期間"><button data-range="three_months" aria-pressed="true">3か月</button><button data-range="six_months" aria-pressed="false">半年</button><button data-range="year" aria-pressed="false">1年</button><button data-range="all" aria-pressed="false">記録開始から</button></div>
+<p id="status" class="muted" role="status" aria-live="polite">読み込み中…</p></section>
+<div id="report" hidden>
+<section class="card"><div id="period" class="muted"></div><div id="sales" class="hero"></div><div class="muted">店舗の会計済み売上</div><div class="grid secondary"><div class="stat"><small>注文数</small><b id="orders"></b></div><div class="stat"><small>記録開始</small><b id="first"></b></div></div><div id="slots" class="secondary"></div></section>
+<section class="card"><h2>油そば、どちらが多い？</h2><div id="flavors"></div><p class="muted">博多系・えび塩系は、チャーシューや壱岐牛などの派生商品も含めた杯数です。</p><h2>商品ごとの杯数</h2><div id="products"></div></section>
+<section class="card"><h2>麺量の選ばれ方</h2><div id="sizes"></div><p class="muted">全油そばの杯数を分母にしています。麺量の記録がない杯は「未記録」で、普通盛りに推測しません。</p></section>
+<section class="card"><h2>セットの付きやすさ</h2><div id="attach"></div><div id="sets"></div><p class="muted">付帯率＝同じ会計済み注文に油そばとセットが両方ある注文数 ÷ 油そばを含む注文数。セット単独注文は付帯率に含みません。1注文で複数セットを選べるため、A〜Eの率を足しても100%とは限りません。</p></section>
+<section class="card"><h2>チャーシュー丼と仕込み</h2><div id="don"></div><p class="muted">単品のチャーシュー丼と、D・Eセットを分けて表示。セットの内容が変わる場合は、実際のレシピを確認してから仕込み量に換算します。</p></section>
+<section class="card"><h2>経営の見方</h2><div id="insights"></div><p class="muted">傾向は判断の材料です。商品の廃止・仕込み変更は客層や原価、在庫、欠品も確認して決めてください。</p></section>
+<section class="card"><p class="muted">「開店以来」ではなく、MACHI ORDERに会計済み注文が記録され始めた日からの集計です。システム導入前の売上は含みません。Uber Eats・ロケットナウなど、別途入力した外部売上もこの画面には含みません。</p></section>
+</div>
+</main><script>
+const $=id=>document.getElementById(id), params=new URLSearchParams(location.search), yen=n=>'¥'+Number(n||0).toLocaleString('ja-JP'), number=n=>Number(n||0).toLocaleString('ja-JP'), rate=(a,b)=>b?Math.round(a/b*1000)/10+'%':'—';
+const token=()=>localStorage.machi_access_token||localStorage.mo_staff_token||localStorage.access_token||localStorage.sb_access_token||'';
+let range=['three_months','six_months','year','all'].includes(params.get('range'))?params.get('range'):'three_months';
+$('store').value=['1','2'].includes(params.get('store_id'))?params.get('store_id'):String(window.MACHI_STORE_ID||localStorage.machi_store_id||1);
+function row(label,value){const el=document.createElement('div'),name=document.createElement('span'),amount=document.createElement('b');el.className='row';name.textContent=label;amount.textContent=value;el.append(name,amount);return el}
+function rows(id,values){$(id).replaceChildren(...values.map(([label,value])=>row(label,value)))}
+function insight(message){const el=document.createElement('p');el.className='insight';el.textContent=message;return el}
+function render(data){
+  $('report').hidden=false;
+  const names={lunch:'昼営業',dinner:'夜営業',other:'その他・区分なし'};
+  $('period').textContent=data.from+' 〜 '+new Date(new Date(data.to_exclusive+'T12:00:00Z').getTime()-86400000).toISOString().slice(0,10);
+  $('sales').textContent=yen(data.sales?.amount);$('orders').textContent=number(data.sales?.orders)+'件';$('first').textContent=data.first_recorded_sale||'記録なし';
+  const slotMap=new Map((data.slots||[]).map(x=>[x.slot,x]));
+  rows('slots',['lunch','dinner','other'].map(key=>[names[key],yen(slotMap.get(key)?.amount)+' · '+number(slotMap.get(key)?.orders)+'件']));
+  const flavorMap=new Map((data.flavors||[]).map(x=>[x.flavor,Number(x.cups)])), noodleCups=[...flavorMap.values()].reduce((a,b)=>a+b,0);
+  rows('flavors',[['博多系',number(flavorMap.get('hakata'))+'杯 · '+rate(flavorMap.get('hakata')||0,noodleCups)],['えび塩系',number(flavorMap.get('ebi_shio'))+'杯 · '+rate(flavorMap.get('ebi_shio')||0,noodleCups)],['その他',number(flavorMap.get('other'))+'杯']]);
+  rows('products',(data.products||[]).map(x=>[x.name,number(x.cups)+'杯']));
+  if(!(data.products||[]).length)$('products').textContent='まだ会計済みの油そばがありません。';
+  const sizeTotals=new Map();for(const x of data.sizes||[])sizeTotals.set(x.size,(sizeTotals.get(x.size)||0)+Number(x.cups));
+  rows('sizes',['半玉','普通','大盛','W玉','未記録'].map(key=>[key,number(sizeTotals.get(key))+'杯 · '+rate(sizeTotals.get(key)||0,noodleCups)]));
+  const attachMap=new Map((data.attach||[]).map(x=>[x.slot,x])), allNoodle=(data.attach||[]).reduce((a,x)=>a+Number(x.noodle_orders||0),0), allAttached=(data.attach||[]).reduce((a,x)=>a+Number(x.with_set_orders||0),0);
+  rows('attach',[['全体のセット付帯率',rate(allAttached,allNoodle)+' （'+number(allAttached)+' / '+number(allNoodle)+'注文）'],...['lunch','dinner','other'].map(key=>[names[key],rate(attachMap.get(key)?.with_set_orders||0,attachMap.get(key)?.noodle_orders||0)+' （'+number(attachMap.get(key)?.with_set_orders)+' / '+number(attachMap.get(key)?.noodle_orders)+'注文）'])]);
+  const setRows=[];for(const code of ['A','B','C','D','E']){const matches=(data.sets||[]).filter(x=>x.code===code),units=matches.reduce((a,x)=>a+Number(x.units||0),0),attached=matches.reduce((a,x)=>a+Number(x.noodle_orders_with_set||0),0);setRows.push([code+'セット',number(units)+'点 · 油そば注文付帯 '+rate(attached,allNoodle)])}
+  rows('sets',setRows);
+  const donSingles=(data.chashu_rice_bowls||[]).reduce((a,x)=>a+Number(x.units||0),0), donSets=(data.sets||[]).filter(x=>['D','E'].includes(x.code)).reduce((a,x)=>a+Number(x.units||0),0);
+  rows('don',[['チャーシュー丼 単品',number(donSingles)+'点'],['D・Eセット',number(donSets)+'点'],['参考：丼の提供数',number(donSingles+donSets)+'点（セットに丼1点を含む場合）']]);
+  const notes=[];
+  if(!noodleCups)notes.push('まだ油そばの会計済み注文がありません。販売が蓄積されてから比較できます。');
+  else{
+    if(noodleCups>=30){const h=flavorMap.get('hakata')||0,e=flavorMap.get('ebi_shio')||0;if(h!==e)notes.push((h>e?'博多系':'えび塩系')+'が多く出ています。品目ごとの原価・欠品・時間帯も合わせて比較すると仕込み配分を決めやすくなります。')}
+    if((sizeTotals.get('未記録')||0)>0)notes.push('麺量が未記録の杯があります。割合の精度を上げるには注文時の麺量選択を確認してください。');
+    if(noodleCups>=30&&(sizeTotals.get('半玉')||0)/noodleCups<0.05)notes.push('半玉の割合は5%未満です。ただし廃止の前に、少食のお客様の再来店や食品ロスへの影響を確認してください。');
+    if((attachMap.get('lunch')?.noodle_orders||0)>=20&&(attachMap.get('dinner')?.noodle_orders||0)>=20){const l=attachMap.get('lunch'),d=attachMap.get('dinner');if(Math.abs(l.with_set_orders/l.noodle_orders-d.with_set_orders/d.noodle_orders)>=0.1)notes.push('昼夜のセット付帯率に10ポイント以上の差があります。弱い時間帯の声かけやセットの見せ方を小さく試して比較できます。')}
+    notes.push('仕込み必要枚数と在庫の残り日数は、メニュー別のチャーシュー使用枚数・現在庫・発注リードタイムを登録してから計算します。');
+  }
+  $('insights').replaceChildren(...notes.map(insight));
+}
+async function load(){
+  const access=token();if(!access){location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search));return}
+  $('report').hidden=true;$('status').className='muted';$('status').textContent='集計中…';
+  const store=$('store').value;
+  try{const query=new URLSearchParams({store_id:store,range});const response=await fetch('https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/sales-insights-api?'+query,{headers:{Authorization:'Bearer '+access}}),data=await response.json().catch(()=>({}));
+    if(response.status===401){location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search));return}
+    if(!response.ok)throw Error(data.error||'分析を読み込めません');render(data);$('status').textContent='更新 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    const url=new URL(location.href);url.searchParams.set('store_id',store);url.searchParams.set('range',range);history.replaceState(null,'',url);
+    $('back').href='/sales-report.html?store_id='+store;$('finance').href='/financial-analysis.html?store_id='+store;
+  }catch(error){$('status').className='muted error';$('status').textContent=error.message}
+}
+document.querySelectorAll('[data-range]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.range===range));button.addEventListener('click',()=>{range=button.dataset.range;document.querySelectorAll('[data-range]').forEach(x=>x.setAttribute('aria-pressed',String(x===button)));load()})});
+$('store').addEventListener('change',()=>{localStorage.setItem('machi_store_id',$('store').value);load()});
+load();
+</script></body></html>
