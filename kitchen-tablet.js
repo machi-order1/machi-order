@@ -26,6 +26,30 @@
       card.classList.add(order.status);
       const ageNode = card.querySelector('.age');
       if (ageNode) ageNode.setAttribute('aria-label', '注文から ' + age(order.ordered_at));
+      (order.order_items || []).forEach((item, itemIndex) => {
+        const line = card.querySelectorAll('.item')[itemIndex];
+        if (!line) return;
+        const options = (item.order_item_options || []).map(option => String(option.option_name_snapshot || ''));
+        const omissions = options.filter(name => /抜き$/.test(name));
+        if (omissions.length) {
+          card.classList.add('has-omission');
+          const banner = document.createElement('div');
+          banner.className = 'omission-banner';
+          banner.textContent = `⚠ 入れない：${omissions.join('・')}（${item.product_name_snapshot} ×${item.quantity}）`;
+          line.prepend(banner);
+        }
+        if (options.length) {
+          const originalOptions = line.querySelector('.opts');
+          if (originalOptions) originalOptions.remove();
+          const additions = options.filter(name => !/抜き$/.test(name));
+          if (additions.length) {
+            const extra = document.createElement('div');
+            extra.className = 'addition-options';
+            extra.textContent = '変更・追加：' + additions.join('・');
+            line.querySelector('.iname')?.after(extra);
+          }
+        }
+      });
     });
   };
   render();
