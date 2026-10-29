@@ -14,7 +14,7 @@ begin
   end if;
 
   with paid as (
-    select o.id, o.business_date, o.total, o.business_period_id,
+    select o.id, o.business_date, o.total, o.business_period_id, o.guest_count, o.check_group_id,
       case when bp.name like '%昼%' then 'lunch'
            when bp.name like '%夜%' then 'dinner' else 'other' end slot
     from public.orders o
@@ -37,8 +37,20 @@ begin
     group by p.id,p.slot
   ), sales as (
     select count(*) orders, coalesce(sum(total),0) amount from paid
+  ), visits as (
+    select business_date, slot,
+      case when check_group_id is null then 'o:' || id::text else 'g:' || check_group_id::text end visit_key,
+      max(greatest(coalesce(guest_count,1),1)) guests
+    from paid group by business_date,slot,visit_key
+  ), guest_totals as (
+    select coalesce(sum(guests),0) guests, count(*) visits from visits
+  ), slot_guests as (
+    select slot,sum(guests) guests,count(*) visits from visits group by slot
   ), slots as (
     select slot, count(*) orders, sum(total) amount from paid group by slot
+  ), all_products as (
+    select product_id,name,sum(quantity) units,sum(line_total) line_sales,bool_or(is_noodle) is_noodle
+    from items group by product_id,name
   ), products as (
     select product_id, name, sum(quantity) cups, sum(line_total) line_sales
     from items where is_noodle group by product_id,name
@@ -73,8 +85,15 @@ begin
     where i.set_code is not null group by i.slot,i.set_code
   )
   select jsonb_build_object(
-    'sales', (select jsonb_build_object('amount',amount,'orders',orders) from sales),
-    'slots', coalesce((select jsonb_agg(jsonb_build_object('slot',slot,'amount',amount,'orders',orders)) from slots),'[]'::jsonb),
+    'sales', (select jsonb_build_object('amount',s.amount,'orders',s.orders,'guests',g.guests,'visits',g.visits,
+      'average_per_guest',case when g.guests>0 then round(s.amount/g.guests) else null end)
+      from sales s cross join guest_totals g),
+    'slots', coalesce((select jsonb_agg(jsonb_build_object('slot',s.slot,'amount',s.amount,'orders',s.orders,
+      'guests',coalesce(g.guests,0),'visits',coalesce(g.visits,0),
+      'average_per_guest',case when g.guests>0 then round(s.amount/g.guests) else null end))
+      from slots s left join slot_guests g on g.slot=s.slot),'[]'::jsonb),
+    'all_products', coalesce((select jsonb_agg(jsonb_build_object('product_id',product_id,'name',name,'units',units,
+      'line_sales',line_sales,'is_noodle',is_noodle) order by units desc,name) from all_products),'[]'::jsonb),
     'products', coalesce((select jsonb_agg(jsonb_build_object('product_id',product_id,'name',name,'cups',cups,'line_sales',line_sales) order by cups desc,name) from products),'[]'::jsonb),
     'flavors', coalesce((select jsonb_agg(jsonb_build_object('flavor',flavor,'cups',cups)) from flavors),'[]'::jsonb),
     'chashu_rice_bowls', coalesce((select jsonb_agg(jsonb_build_object('name',name,'units',units) order by name) from rice_bowls),'[]'::jsonb),
