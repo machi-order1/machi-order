@@ -6,17 +6,19 @@
 <link rel="stylesheet" href="/machi-design-system.css"><script src="/machi-ui-config.js"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f5f5f7;color:#171717;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}main{max-width:850px;margin:auto;padding:20px 15px 90px}h1{font-size:26px;margin:20px 0 5px}h2{font-size:20px;margin:0 0 15px}.muted{color:#62656a;font-size:13px;line-height:1.6}.card{background:#fff;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 1px 8px #0000000a}.top{display:flex;justify-content:space-between;gap:12px;align-items:center}.top a{color:#222}.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.controls select{padding:12px;border:1px solid #ddd;border-radius:10px;font-size:16px;background:white}.ranges{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.ranges button{border:0;background:#e9eaed;border-radius:11px;padding:11px 14px;font-size:14px;font-weight:700;cursor:pointer}.ranges button[aria-pressed="true"]{background:#161616;color:#fff}.hero{font-size:39px;font-weight:850;margin:6px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stat{padding:12px;background:#f4f5f6;border-radius:11px}.stat small{display:block;color:#666}.stat b{display:block;font-size:20px;margin-top:5px}.row{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #eee;padding:10px 0}.row:last-child{border:0}.row span{min-width:0}.row b{white-space:nowrap}.empty{padding:20px;color:#666}.insight{background:#f4f8ed;border-radius:12px;padding:13px;margin:10px 0;line-height:1.6}.error{color:#a71920}.secondary{margin-top:8px}
+.controls input{display:block;padding:12px;border:1px solid #ddd;border-radius:10px;font-size:16px;background:#fff}.controls label{font-size:13px;font-weight:700}.top{flex-wrap:wrap}
 </style>
 </head>
 <body><main>
 <div class="top"><a href="/sales-report.html" id="back">← 日・週・月の売上</a><a href="/financial-analysis.html" id="finance">年次・経費の分析 →</a></div>
 <h1>商品と売上の分析</h1><p class="muted">店舗ごとの会計済み注文だけを集計。売上は税込み、商品別金額は値引き前の明細です。</p>
 <section class="card"><div class="controls"><label>店舗 <select id="store"><option value="1">博多油そば151 長浜店</option><option value="2">博多油そば151 白木原店</option></select></label></div>
-<div class="ranges" aria-label="分析期間"><button data-range="three_months" aria-pressed="true">3か月</button><button data-range="six_months" aria-pressed="false">半年</button><button data-range="year" aria-pressed="false">1年</button><button data-range="all" aria-pressed="false">記録開始から</button></div>
+<div class="ranges" aria-label="分析期間"><button data-range="today">今日</button><button data-range="yesterday">昨日</button><button data-range="this_week">今週</button><button data-range="date">指定日</button><button data-range="month">指定月</button><button data-range="three_months_ago">3か月前の月</button><button data-range="three_months">直近3か月</button><button data-range="six_months">半年</button><button data-range="year">1年</button><button data-range="all">記録開始から</button></div>
+<div class="controls secondary"><label id="date-wrap" hidden>営業日 <input id="selected-date" type="date"></label><label id="month-wrap" hidden>対象月 <input id="selected-month" type="month"></label></div>
 <p id="status" class="muted" role="status" aria-live="polite">読み込み中…</p></section>
 <div id="report" hidden>
-<section class="card"><div id="period" class="muted"></div><div id="sales" class="hero"></div><div class="muted">店舗の会計済み売上</div><div class="grid secondary"><div class="stat"><small>注文数</small><b id="orders"></b></div><div class="stat"><small>記録開始</small><b id="first"></b></div></div><div id="slots" class="secondary"></div></section>
-<section class="card"><h2>油そば、どちらが多い？</h2><div id="flavors"></div><p class="muted">博多系・えび塩系は、チャーシューや壱岐牛などの派生商品も含めた杯数です。</p><h2>商品ごとの杯数</h2><div id="products"></div></section>
+<section class="card"><div id="period" class="muted"></div><div id="sales" class="hero"></div><div class="muted">店舗の会計済み売上</div><div class="grid secondary"><div class="stat"><small>一人あたり客単価</small><b id="ticket"></b></div><div class="stat"><small>客数</small><b id="guests"></b></div><div class="stat"><small>注文数</small><b id="orders"></b></div><div class="stat"><small>記録開始</small><b id="first"></b></div></div><h2 class="secondary">昼・夜の客単価</h2><div id="slots" class="secondary"></div><p class="muted">客単価＝会計済み売上 ÷ 客数。同じ営業日・昼夜区分・会計グループ内の追加注文は、客数を重複して数えません。客数がない場合は「—」。</p></section>
+<section class="card"><h2>油そば、どちらが多い？</h2><div id="flavors"></div><p class="muted">博多系・えび塩系は、チャーシューや壱岐牛などの派生商品も含めた杯数です。</p><h2>全商品ごとの販売数</h2><div id="all-products"></div><p class="muted">商品明細の販売点数です。値引きがある注文の商品別売上とは異なるため、ここでは数量を表示します。</p><h2>油そばの商品別杯数</h2><div id="products"></div></section>
 <section class="card"><h2>麺量の選ばれ方</h2><div id="sizes"></div><p class="muted">全油そばの杯数を分母にしています。麺量の記録がない杯は「未記録」で、普通盛りに推測しません。</p></section>
 <section class="card"><h2>セットの付きやすさ</h2><div id="attach"></div><div id="sets"></div><p class="muted">付帯率＝同じ会計済み注文に油そばとセットが両方ある注文数 ÷ 油そばを含む注文数。セット単独注文は付帯率に含みません。1注文で複数セットを選べるため、A〜Eの率を足しても100%とは限りません。</p></section>
 <section class="card"><h2>チャーシュー丼と仕込み</h2><div id="don"></div><p class="muted">単品のチャーシュー丼と、D・Eセットを分けて表示。セットの内容が変わる場合は、実際のレシピを確認してから仕込み量に換算します。</p></section>
@@ -26,8 +28,12 @@
 </main><script>
 const $=id=>document.getElementById(id), params=new URLSearchParams(location.search), yen=n=>'¥'+Number(n||0).toLocaleString('ja-JP'), number=n=>Number(n||0).toLocaleString('ja-JP'), rate=(a,b)=>b?Math.round(a/b*1000)/10+'%':'—';
 const token=()=>localStorage.machi_access_token||localStorage.mo_staff_token||localStorage.access_token||localStorage.sb_access_token||'';
-let range=['three_months','six_months','year','all'].includes(params.get('range'))?params.get('range'):'three_months';
+const ranges=['today','yesterday','this_week','date','month','three_months_ago','three_months','six_months','year','all'];
+let range=ranges.includes(params.get('range'))?params.get('range'):'today';
 $('store').value=['1','2'].includes(params.get('store_id'))?params.get('store_id'):String(window.MACHI_STORE_ID||localStorage.machi_store_id||1);
+$('selected-date').value=params.get('date')||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+$('selected-month').value=params.get('month')||$('selected-date').value.slice(0,7);
+function controls(){const date=range==='date',month=range==='month';$('date-wrap').hidden=!date;$('month-wrap').hidden=!month;document.querySelectorAll('[data-range]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.range===range)))}
 function row(label,value){const el=document.createElement('div'),name=document.createElement('span'),amount=document.createElement('b');el.className='row';name.textContent=label;amount.textContent=value;el.append(name,amount);return el}
 function rows(id,values){$(id).replaceChildren(...values.map(([label,value])=>row(label,value)))}
 function insight(message){const el=document.createElement('p');el.className='insight';el.textContent=message;return el}
@@ -35,11 +41,13 @@ function render(data){
   $('report').hidden=false;
   const names={lunch:'昼営業',dinner:'夜営業',other:'その他・区分なし'};
   $('period').textContent=data.from+' 〜 '+new Date(new Date(data.to_exclusive+'T12:00:00Z').getTime()-86400000).toISOString().slice(0,10);
-  $('sales').textContent=yen(data.sales?.amount);$('orders').textContent=number(data.sales?.orders)+'件';$('first').textContent=data.first_recorded_sale||'記録なし';
+  $('sales').textContent=yen(data.sales?.amount);$('ticket').textContent=data.sales?.guests>0?yen(data.sales.average_per_guest):'—';$('guests').textContent=number(data.sales?.guests)+'人';$('orders').textContent=number(data.sales?.orders)+'件';$('first').textContent=data.first_recorded_sale||'記録なし';
   const slotMap=new Map((data.slots||[]).map(x=>[x.slot,x]));
-  rows('slots',['lunch','dinner','other'].map(key=>[names[key],yen(slotMap.get(key)?.amount)+' · '+number(slotMap.get(key)?.orders)+'件']));
+  rows('slots',['lunch','dinner','other'].map(key=>{const x=slotMap.get(key);return[names[key],(x?.guests>0?yen(x.average_per_guest):'—')+' / 人 · '+number(x?.guests)+'人 · 売上'+yen(x?.amount)]}));
   const flavorMap=new Map((data.flavors||[]).map(x=>[x.flavor,Number(x.cups)])), noodleCups=[...flavorMap.values()].reduce((a,b)=>a+b,0);
   rows('flavors',[['博多系',number(flavorMap.get('hakata'))+'杯 · '+rate(flavorMap.get('hakata')||0,noodleCups)],['えび塩系',number(flavorMap.get('ebi_shio'))+'杯 · '+rate(flavorMap.get('ebi_shio')||0,noodleCups)],['その他',number(flavorMap.get('other'))+'杯']]);
+  rows('all-products',(data.all_products||[]).map(x=>[x.name,number(x.units)+(x.is_noodle?'杯':'点')]));
+  if(!(data.all_products||[]).length)$('all-products').textContent='この期間の会計済み商品はありません。';
   rows('products',(data.products||[]).map(x=>[x.name,number(x.cups)+'杯']));
   if(!(data.products||[]).length)$('products').textContent='まだ会計済みの油そばがありません。';
   const sizeTotals=new Map();for(const x of data.sizes||[])sizeTotals.set(x.size,(sizeTotals.get(x.size)||0)+Number(x.cups));
@@ -65,14 +73,15 @@ async function load(){
   const access=token();if(!access){location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search));return}
   $('report').hidden=true;$('status').className='muted';$('status').textContent='集計中…';
   const store=$('store').value;
-  try{const query=new URLSearchParams({store_id:store,range});const response=await fetch('https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/sales-insights-api?'+query,{headers:{Authorization:'Bearer '+access}}),data=await response.json().catch(()=>({}));
+  try{const query=new URLSearchParams({store_id:store,range});if(range==='date')query.set('date',$('selected-date').value);if(range==='month')query.set('month',$('selected-month').value);const response=await fetch('https://tejglrlkaqolbghoagqj.supabase.co/functions/v1/sales-insights-api?'+query,{headers:{Authorization:'Bearer '+access}}),data=await response.json().catch(()=>({}));
     if(response.status===401){location.replace('/login.html?next='+encodeURIComponent(location.pathname+location.search));return}
     if(!response.ok)throw Error(data.error||'分析を読み込めません');render(data);$('status').textContent='更新 '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
-    const url=new URL(location.href);url.searchParams.set('store_id',store);url.searchParams.set('range',range);history.replaceState(null,'',url);
+    const url=new URL(location.href);url.searchParams.set('store_id',store);url.searchParams.set('range',range);url.searchParams.delete('date');url.searchParams.delete('month');if(range==='date')url.searchParams.set('date',$('selected-date').value);if(range==='month')url.searchParams.set('month',$('selected-month').value);history.replaceState(null,'',url);
     $('back').href='/sales-report.html?store_id='+store;$('finance').href='/financial-analysis.html?store_id='+store;
   }catch(error){$('status').className='muted error';$('status').textContent=error.message}
 }
-document.querySelectorAll('[data-range]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.range===range));button.addEventListener('click',()=>{range=button.dataset.range;document.querySelectorAll('[data-range]').forEach(x=>x.setAttribute('aria-pressed',String(x===button)));load()})});
+document.querySelectorAll('[data-range]').forEach(button=>button.addEventListener('click',()=>{range=button.dataset.range;controls();load()}));
 $('store').addEventListener('change',()=>{localStorage.setItem('machi_store_id',$('store').value);load()});
-load();
+$('selected-date').addEventListener('change',load);$('selected-month').addEventListener('change',load);
+controls();load();
 </script></body></html>
