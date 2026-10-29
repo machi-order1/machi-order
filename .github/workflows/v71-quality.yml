@@ -57,5 +57,7 @@ jobs:
         run: node scripts/sales-insights-test.mjs
       - name: Check kitchen omission alerts
         run: node --check kitchen-tablet.js && node scripts/kitchen-omission-test.mjs
+      - name: Check two-store checkout routing
+        run: node scripts/two-store-checkout-test.mjs
       - name: Run V71 regression checks
         run: node scripts/qa-v71.mjs
