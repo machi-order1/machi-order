@@ -36,7 +36,8 @@ begin
     from paid p left join items i on i.order_id = p.id
     group by p.id,p.slot
   ), sales as (
-    select count(*) orders, coalesce(sum(total),0) amount from paid
+    select count(*) orders, coalesce(sum(total),0) amount,
+      count(*) filter (where guest_count is null or guest_count < 1) missing_guest_orders from paid
   ), visits as (
     select business_date, slot,
       case when check_group_id is null then 'o:' || id::text else 'g:' || check_group_id::text end visit_key,
@@ -47,7 +48,9 @@ begin
   ), slot_guests as (
     select slot,sum(guests) guests,count(*) visits from visits group by slot
   ), slots as (
-    select slot, count(*) orders, sum(total) amount from paid group by slot
+    select slot, count(*) orders, sum(total) amount,
+      count(*) filter (where guest_count is null or guest_count < 1) missing_guest_orders
+    from paid group by slot
   ), all_products as (
     select product_id,name,sum(quantity) units,sum(line_total) line_sales,bool_or(is_noodle) is_noodle
     from items group by product_id,name
@@ -86,10 +89,11 @@ begin
   )
   select jsonb_build_object(
     'sales', (select jsonb_build_object('amount',s.amount,'orders',s.orders,'guests',g.guests,'visits',g.visits,
+      'missing_guest_orders',s.missing_guest_orders,
       'average_per_guest',case when g.guests>0 then round(s.amount/g.guests) else null end)
       from sales s cross join guest_totals g),
     'slots', coalesce((select jsonb_agg(jsonb_build_object('slot',s.slot,'amount',s.amount,'orders',s.orders,
-      'guests',coalesce(g.guests,0),'visits',coalesce(g.visits,0),
+      'guests',coalesce(g.guests,0),'visits',coalesce(g.visits,0),'missing_guest_orders',s.missing_guest_orders,
       'average_per_guest',case when g.guests>0 then round(s.amount/g.guests) else null end))
       from slots s left join slot_guests g on g.slot=s.slot),'[]'::jsonb),
     'all_products', coalesce((select jsonb_agg(jsonb_build_object('product_id',product_id,'name',name,'units',units,
