@@ -50,6 +50,20 @@
           }
         }
       });
+      if (order.status === 'new' && card.classList.contains('has-omission')) {
+        const action = card.querySelector('.act');
+        action?.addEventListener('click', event => {
+          const warnings = (order.order_items || []).flatMap(item =>
+            (item.order_item_options || [])
+              .map(option => String(option.option_name_snapshot || ''))
+              .filter(name => /抜き$/.test(name))
+              .map(name => `${item.product_name_snapshot} ×${item.quantity}：${name}`));
+          if (!confirm('抜き指定を確認しましたか？\n\n' + warnings.join('\n') + '\n\n確認後に調理を開始してください。')) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, { capture: true });
+      }
     });
   };
   render();
