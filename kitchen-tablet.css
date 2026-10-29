@@ -34,4 +34,10 @@
 .kitchen-summary .summary-chip.alert {background:#fff0ee;border-color:#e51b23;color:#b71920}
 .kitchen-summary .summary-chip.warn {background:#fff3df;border-color:#d58b31;color:#85500e}
 .kitchen-summary .summary-note {font-size:14px;color:#626b77;margin-left:auto}
+.card.has-omission {border:3px solid #bb2020!important}
+.card.has-omission .meta {background:#fff0ef}
+.card .item:has(.omission-banner) {flex-wrap:wrap;gap:7px}
+.omission-banner {flex:0 0 100%;background:#bb2020;color:#fff;border-radius:9px;padding:9px 12px;font-size:20px;font-weight:950;line-height:1.4}
+.addition-options {font-size:16px;font-weight:700;color:#424b57;margin-top:5px}
+@media(min-width:800px){.omission-banner{font-size:24px;padding:12px 14px}.addition-options{font-size:18px}}
 @media(max-width:799px){.kitchen-summary{margin-bottom:12px}.kitchen-summary strong{width:100%;font-size:17px}.kitchen-summary .summary-chip{font-size:14px;padding:7px 10px}}
