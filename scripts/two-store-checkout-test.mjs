@@ -17,6 +17,10 @@ for (const page of [kitchen, cashier]) {
 }
 assert(kitchenTablet.includes("cashierLink.href = '/cashier.html?store=shirakibaru'"));
 assert(cashier.includes("href='/kitchen.html?store=shirakibaru'"));
+assert(kitchenTablet.includes("homeLink.href = '/kitchen-apps.html'"));
+assert(cashier.includes("homeLink.href='/kitchen-apps.html'"));
+assert(kitchenTablet.includes("link.hidden = true"));
+assert(cashier.includes("link.hidden=true"));
 assert(kitchenApi.includes(".eq('store_id', storeId)"));
 assert(cashierApi.includes(".eq('store_id', storeId)"));
 assert(cashierApi.includes("sb.rpc('complete_order_payment'"));
