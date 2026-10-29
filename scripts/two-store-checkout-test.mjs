@@ -9,6 +9,7 @@ const cashier = read('cashier.html');
 const kitchenApi = read('supabase/functions/kitchen-api/index.ts');
 const cashierApi = read('supabase/functions/cashier-api/index.ts');
 const menuApi = read('supabase/functions/menu-api/index.ts');
+const worker = read('sw.js');
 
 for (const page of [kitchen, cashier]) {
   assert(page.includes("STORE_CODE==='shirakibaru'?2:1"), 'White store ID is 2');
@@ -26,4 +27,5 @@ assert(cashierApi.includes(".eq('store_id', storeId)"));
 assert(cashierApi.includes("sb.rpc('complete_order_payment'"));
 assert(menuApi.includes(".eq('qr_token', token)"));
 assert(menuApi.includes("p_client_order_key: requestId"));
+assert(worker.includes("'/kitchen-tablet.css'") && worker.includes("'/kitchen-tablet.js'"), 'Tablet assets are cached together with the kitchen page');
 console.log('Two-store QR → kitchen → cashier routing invariants: passed');
