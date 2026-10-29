@@ -49,5 +49,7 @@ jobs:
         run: node --check campaign-log.js && node --experimental-strip-types --check supabase/functions/campaign-api/index.ts
       - name: Check receipt and invoice OCR suggestions
         run: node --experimental-strip-types scripts/test-receipt-parser.mjs && node --experimental-strip-types scripts/test-invoice-parser.mjs
+      - name: Check kitchen and two-store boundaries
+        run: node --check kitchen-tablet.js && node scripts/kitchen-omission-test.mjs && node scripts/two-store-checkout-test.mjs
       - name: Run V71 regression checks
         run: node scripts/qa-v71.mjs
