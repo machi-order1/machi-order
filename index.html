@@ -315,10 +315,12 @@
     }
     function goCategory(id) {
       $('added-notice')?.remove();
-      setActiveCategory(id);
       const target = $(`c${id}`);
-      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      if (target) window.scrollTo({ top: Math.max(0, scrollY + target.getBoundingClientRect().top - 12 - (alcoholPinned ? $('happy-offer').getBoundingClientRect().height : 0)), behavior: reducedMotion ? 'auto' : 'smooth' });
+      if (!target) return;
+      // Long smooth scrolls pass through other sections and make the selected tab flicker.
+      // Jump directly to the chosen section, then keep the selected state in sync.
+      window.scrollTo({ top: Math.max(0, scrollY + target.getBoundingClientRect().top - 12 - (alcoholPinned ? $('happy-offer').getBoundingClientRect().height : 0)), behavior: 'auto' });
+      setActiveCategory(id);
     }
     let stopObservingSections = null;
     function observeSections() {
@@ -329,8 +331,9 @@
         frame = null;
         if (!sections.length) return;
         let active = sections[0];
+        const activationLine = 24 + (alcoholPinned ? ($('happy-offer')?.getBoundingClientRect().height || 0) : 0);
         for (const section of sections) {
-          if (section.getBoundingClientRect().top <= 24) active = section;
+          if (section.getBoundingClientRect().top <= activationLine) active = section;
         }
         if (scrollY > 0 && scrollY + innerHeight >= document.documentElement.scrollHeight - 2) {
           active = sections[sections.length - 1];
