@@ -42,7 +42,7 @@
       e.preventDefault();const b=document.getElementById('submit'),m=document.getElementById('message');b.disabled=true;b.textContent='確認しています…';m.className='msg';m.textContent='';
       try{
         const r=await fetch(SUPABASE+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value})});
-        const j=await r.json().catch(()=>({}));if(!r.ok){const raw=j.error_description||j.msg||'';throw Error(/invalid login credentials/i.test(raw)?'パスワードが違います。下の「パスワードを再設定する」を押してください。':raw||'メールアドレスまたはパスワードが違います')}
+        const j=await r.json().catch(()=>({}));if(!r.ok){const raw=j.error_description||j.msg||'';throw Error(/invalid login credentials/i.test(raw)?'メールアドレスまたはパスワードを確認してください。登録したメールアドレスか分からない場合は店舗責任者に確認してください。パスワードが不明な場合は、下の「パスワードを再設定する」を押してください。':raw||'メールアドレスまたはパスワードを確認してください。')}
         saveSession(j);location.replace(next);
       }catch(err){m.textContent=err.message||'ログインできませんでした';b.disabled=false;b.textContent='ログインして厨房を開く'}
     });
